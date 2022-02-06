@@ -26,6 +26,10 @@ export class P2PConnection {
 
   // private async waitForEvent() {}
 
+  test() {
+    console.log('test');
+  }
+
   private async createLocalConnection() {
     const conn = new RTCPeerConnection(this.__rtcConfig);
     const data = conn.createDataChannel(this.id);

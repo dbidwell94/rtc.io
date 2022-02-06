@@ -17,7 +17,8 @@
     "build": "rimraf dist/ && tsc",
     "prepare": "husky install",
     "lint": "prettier --ignore-path .gitignore . --write && eslint --ignore-path .gitignore . --fix",
-    "prepack": "npm run lint && npm run build"
+    "prepack": "npm run lint && npm run build",
+    "develop": "rimraf dist/ && tsc --watch"
   },
   "keywords": [
     "WebRTC",
