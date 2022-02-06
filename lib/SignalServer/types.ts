@@ -1,5 +1,9 @@
 export interface ISignalServer {
   /**
+   * The id unique to _this_ SignalServer synced with remote server
+   */
+  id: string;
+  /**
    * Connect to a new room. Returns a list of potential peers to connect to (if available)
    */
   connectToRoom: (roomName: string) => Promise<string[]>;
@@ -13,5 +17,5 @@ export interface ISignalServer {
   /**
    *
    */
-  getRemoteAnswer: () => Promise<RTCSessionDescription>;
+  onRemoteAnswer: (callback: (answer: RTCSessionDescription) => Promise<void>) => void;
 }

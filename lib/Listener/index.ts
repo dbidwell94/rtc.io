@@ -9,17 +9,37 @@ interface ListenerEventMap<T extends UserDefinedTypeMap> {
   connected: (connection: P2PConnection<T>) => void;
 }
 
+interface IPendingConnectionHost {
+  isHost: true;
+  id: string;
+  connection: RTCPeerConnection;
+  dataChannel: RTCDataChannel;
+}
+
+interface IPendingConnectionClient {
+  isHost: false;
+  id: string;
+  connection: RTCPeerConnection;
+}
+
+type IPendingConnection = IPendingConnectionHost | IPendingConnectionClient;
+
 class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
   private connections: Map<string, P2PConnection<Evt>>;
   private listeners: Map<keyof ListenerEventMap<Evt>, Set<ListenerEventMap<Evt>[keyof ListenerEventMap<Evt>]>>;
   private iceConfig: RTCConfiguration;
   private signalServer: ISignalServer;
 
+  private pendingHostConnections: Set<IPendingConnectionHost>;
+  private pendingRemoteConnections: Set<IPendingConnectionClient>;
+
   constructor(signalServer: ISignalServer, iceConfig?: RTCConfiguration) {
     this.connections = new Map();
     this.listeners = new Map();
     this.iceConfig = iceConfig || {};
     this.signalServer = signalServer;
+    this.pendingHostConnections = new Set();
+    this.pendingRemoteConnections = new Set();
   }
 
   on<E extends keyof ListenerEventMap<Evt>, F extends ListenerEventMap<Evt>[E]>(event: E, callback: F) {
@@ -59,6 +79,14 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     }
   }
 
+  private sendOfferToSignalServer() {
+    // TODO: Finish implementing sending an offer into nothingness
+  }
+
+  /**
+   * Sends offer to the remote peer via the Signal Server
+   * @param peer The ID of the peer as per the Signal Server
+   */
   private async connectToPeer(peer: string) {
     const peerConnection = new RTCPeerConnection(this.iceConfig);
     const peerId = P2PConnection.createP2PId();
@@ -87,6 +115,10 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
         case 'disconnected': {
           break;
         }
+        case 'failed': {
+          peerConnection.close();
+          break;
+        }
       }
     };
 
@@ -95,6 +127,11 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
         this.signalServer.sendOffer(peerConnection.localDescription, peer);
       }
     };
+
+    this.pendingHostConnections.add({ isHost: true, connection: peerConnection, id: peerId, dataChannel: data });
+    this.signalServer.onRemoteAnswer(async (answer) => {
+      await peerConnection.setRemoteDescription(answer);
+    });
   }
 }
 
