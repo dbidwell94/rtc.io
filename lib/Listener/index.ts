@@ -22,8 +22,6 @@ interface IPendingConnectionClient {
   connection: RTCPeerConnection;
 }
 
-type IPendingConnection = IPendingConnectionHost | IPendingConnectionClient;
-
 class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
   private connections: Map<string, P2PConnection<Evt>>;
   private listeners: Map<keyof ListenerEventMap<Evt>, Set<ListenerEventMap<Evt>[keyof ListenerEventMap<Evt>]>>;
