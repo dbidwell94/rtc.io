@@ -1,9 +1,9 @@
-
 # rtc.io
 
 Inspired by socket.io, rct.io is an easier to use way of dealing with WebRTC.
 It wraps the logic of creating RTCPeerConnections in easy-to-use callback
 chaining.
+
 ## Features
 
 - Built in TypeScript and is fully typed
@@ -11,13 +11,11 @@ chaining.
 - Generic typed parameters for custom events listeners and emitters
 - Only one production dependency
 
-
 ## Roadmap
 
 - Finish implementing RTCDataChannel and RTCPeerConnection abstraction
 
 - Abstract video and audio streams
-
 
 ## Usage/Examples
 
@@ -51,4 +49,3 @@ p2p.on('connection' (peer) => {
     })
 });
 ```
-
