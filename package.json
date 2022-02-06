@@ -1,6 +1,6 @@
 {
   "name": "rtc.io",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
