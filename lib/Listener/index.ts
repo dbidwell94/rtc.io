@@ -94,7 +94,13 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
   private async handleRemoteAnswerReceived(fromPeer: string, answer: RTCSessionDescription) {
     if (!this.pendingHostConnections.has(fromPeer)) return;
     const connection = this.pendingHostConnections.get(fromPeer)!;
-    await connection.connection.setRemoteDescription(answer);
+    if (connection.connection.signalingState !== 'stable') {
+      try {
+        await connection.connection.setRemoteDescription(answer);
+      } catch (_) {
+        // TODO: Handle this error;
+      }
+    }
   }
 
   /**
@@ -112,7 +118,13 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     }
     await conn.connection.setRemoteDescription(offer);
     const answer = await conn.connection.createAnswer();
-    await conn.connection.setLocalDescription(answer);
+    if (conn.connection.signalingState !== 'stable') {
+      try {
+        await conn.connection.setLocalDescription(answer);
+      } catch (_) {
+        // TODO: Handle this error
+      }
+    }
   }
 
   private createRemoteConnection(peer: string, room: string): IPendingConnectionClient {

@@ -32,6 +32,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     keyof Partial<MergedInternalEventMap>,
     Set<Partial<MergedInternalEventMap>[keyof MergedInternalEventMap]>
   >;
+  private __eventQueue: IP2PMessageData<T>[];
 
   constructor(conn: RTCPeerConnection, id?: string, link?: RTCDataChannel, connectedRooms?: string[]) {
     this.__id = id || P2PConnection.createP2PId();
@@ -45,6 +46,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     this.__dataLink = link;
     this.__listeners = new Map();
     this.__internalListeners = new Map();
+    this.__eventQueue = [];
     this.initDataChannelListener();
     this.initPeerConnectionListener();
     this.__connectedRooms = connectedRooms;
@@ -59,15 +61,23 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
   }
 
   private initDataChannelListener() {
-    this.__dataLink.onmessage = (msg: MessageEvent<IP2PMessageData<T | MergedInternalEventMap>>) => {
-      if (this.__listeners.has(msg.data.event)) {
-        this.__listeners.get(msg.data.event)!.forEach((callback) => {
-          callback && callback(...msg.data.payload);
+    this.__dataLink.onopen = () => {
+      this.__eventQueue.forEach((item) => {
+        this.__dataLink.send(JSON.stringify(item));
+      });
+      this.__eventQueue = [];
+    };
+
+    this.__dataLink.onmessage = (msg: MessageEvent<string>) => {
+      const data = JSON.parse(msg.data) as IP2PMessageData<T | MergedInternalEventMap>;
+      if (this.__listeners.has(data.event)) {
+        this.__listeners.get(data.event)!.forEach((callback) => {
+          callback && callback(...data.payload);
         });
-      } else if (this.__internalListeners.has(msg.data.event)) {
-        const internalMsg = msg as MessageEvent<IP2PMessageData<MergedInternalEventMap>>;
-        this.__internalListeners.get(internalMsg.data.event)!.forEach((callback) => {
-          callback && callback(...internalMsg.data.payload);
+      } else if (this.__internalListeners.has(data.event)) {
+        const internalMsg = data as IP2PMessageData<MergedInternalEventMap>;
+        this.__internalListeners.get(internalMsg.event)!.forEach((callback) => {
+          callback && callback(...internalMsg.payload);
         });
       }
     };
@@ -141,7 +151,11 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
   }
 
   emit<E extends keyof T, F extends Parameters<T[E]>>(event: E, ...args: F) {
-    this.__dataLink.send(this.createData(event, null, ...args));
+    if (this.__dataLink.readyState !== 'open') {
+      this.__eventQueue.push(this.createData(event, null, true, ...args));
+    } else {
+      this.__dataLink.send(this.createData(event, null, false, ...args));
+    }
   }
 
   private __invokeEvent<E extends keyof MergedInternalEventMap, P extends Parameters<MergedInternalEventMap[E]>>(
@@ -155,18 +169,21 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     }
   }
 
-  private createData<E extends keyof P2PConnectionEventMap<T>, F extends Parameters<P2PConnectionEventMap<T>[E]>>(
-    event: E,
-    toClientId: string | null,
-    ...params: F
-  ): string {
+  private createData<
+    E extends keyof P2PConnectionEventMap<T>,
+    F extends Parameters<P2PConnectionEventMap<T>[E]>,
+    B extends boolean
+  >(event: E, toClientId: string | null, outputObject: B, ...params: F): B extends true ? IP2PMessageData<T> : string {
     const dataToSend = {
       toClientId,
       sendingId: this.id,
       event,
       payload: params,
     };
-    return JSON.stringify(dataToSend);
+    if (outputObject) {
+      return dataToSend as any;
+    }
+    return JSON.stringify(dataToSend) as any;
   }
 
   static createP2PId() {
