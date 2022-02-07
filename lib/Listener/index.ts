@@ -119,12 +119,17 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     await conn.connection.setRemoteDescription(offer);
 
     try {
-      if (conn.connection.signalingState !== 'stable') {
+      if (
+        conn.connection.signalingState === 'have-remote-offer' ||
+        conn.connection.signalingState === 'have-local-pranswer'
+      ) {
         const answer = await conn.connection.createAnswer();
         await conn.connection.setLocalDescription(answer);
       }
     } catch (err) {
-      console.warn(err);
+      // TODO: Handle this error WTF
+      // Failed to execute 'setLocalDescription' on 'RTCPeerConnection': Failed to set local answer sdp: Called in wrong state: stable
+      // BUT HOW!? I'm checking to make sure it's not in the 'stable' state!
     }
   }
 
