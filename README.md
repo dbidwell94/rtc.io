@@ -48,4 +48,6 @@ p2p.on('connection' (peer) => {
         console.log("2nd callback!");
     })
 });
+
+p2p.connect("roomName");
 ```
