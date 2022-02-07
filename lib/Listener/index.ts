@@ -1,10 +1,6 @@
 import { P2PConnection } from '../P2PConnection';
 import { IRtcSocketIoClient } from '../SignalServer';
 
-// export interface UserDefinedTypeMap {
-//   [key: string]: (...args: any) => void;
-// }
-
 export type UserDefinedTypeMap = Record<string, (...args: any) => void>;
 
 interface ListenerEventMap<T extends UserDefinedTypeMap> {
