@@ -10,12 +10,14 @@ export interface ISignalServer {
   disconnectFromRoom: (roomName: string) => void;
   sendOffer: (offer: RTCSessionDescription, toClient?: string) => void;
   sendAnswer: (answer: RTCSessionDescription, toClient: string) => void;
+
   /**
-   * Returns a tuple where [0] is the RTCDescription and [1] is the client id
-   */
-  getRemoteOffer: () => Promise<[config: RTCSessionDescription, clientId: string]>;
-  /**
-   *
+   * Sets a callback to be called when a remote answer is received.
    */
   onRemoteAnswer: (callback: (answer: RTCSessionDescription) => Promise<void>) => void;
+
+  /**
+   * Sets a callback to be called when a remote offer is received.
+   */
+  onRemoteOffer: (callback: (answer: RTCSessionDescription) => Promise<void>) => void;
 }

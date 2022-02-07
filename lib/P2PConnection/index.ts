@@ -1,34 +1,57 @@
 import { UserDefinedTypeMap } from '@lib/Listener';
 import { v1, v4 } from 'uuid';
 
-type P2PConnectionEventMap<T extends UserDefinedTypeMap> = T & {
+type InternalEventMap = UserDefinedTypeMap & {
+  syncClientId: (clientId: string) => void;
+};
+
+type ExternalInternalEventMap = {
   disconnected: () => void;
   closed: () => void;
   failed: () => void;
 };
 
+type MergedInternalEventMap = InternalEventMap & ExternalInternalEventMap;
+
+type P2PConnectionEventMap<T extends UserDefinedTypeMap> = T & ExternalInternalEventMap;
+
 interface IP2PMessageData<T extends UserDefinedTypeMap> {
   toClientId: string | null;
   fromClientId: string;
   event: keyof Partial<T>;
-  payload: Parameters<T[keyof Partial<T>]>;
+  payload: Parameters<T[keyof Partial<T>]>[];
 }
 
 export class P2PConnection<T extends UserDefinedTypeMap> {
   private __id: string;
+  private __connectedRooms: string[];
   private __connection: RTCPeerConnection;
   private __dataLink: RTCDataChannel;
   private __listeners: Map<keyof Partial<P2PConnectionEventMap<T>>, Set<Partial<P2PConnectionEventMap<T>>[keyof T]>>;
+  private __internalListeners: Map<
+    keyof Partial<MergedInternalEventMap>,
+    Set<Partial<MergedInternalEventMap>[keyof MergedInternalEventMap]>
+  >;
 
-  constructor(conn: RTCPeerConnection, id?: string, link?: RTCDataChannel) {
+  constructor(conn: RTCPeerConnection, id?: string, link?: RTCDataChannel, connectedRooms?: string[]) {
     this.__id = id || P2PConnection.createP2PId();
     this.__connection = conn;
     if (!link) {
       link = this.__connection.createDataChannel(this.__id);
     }
+    if (!connectedRooms) {
+      connectedRooms = [];
+    }
     this.__dataLink = link;
     this.__listeners = new Map();
+    this.__internalListeners = new Map();
     this.initDataChannelListener();
+    this.initPeerConnectionListener();
+    this.__connectedRooms = connectedRooms;
+  }
+
+  get connectedRooms(): string[] {
+    return this.__connectedRooms;
   }
 
   get id() {
@@ -36,14 +59,41 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
   }
 
   private initDataChannelListener() {
-    this.__dataLink.onmessage = (msg: MessageEvent<IP2PMessageData<T>>) => {
+    this.__dataLink.onmessage = (msg: MessageEvent<IP2PMessageData<T | MergedInternalEventMap>>) => {
       if (this.__listeners.has(msg.data.event)) {
         this.__listeners.get(msg.data.event)!.forEach((callback) => {
-          const payload = [...msg.data.payload];
-          callback && callback(...payload);
+          callback && callback(...msg.data.payload);
+        });
+      } else if (this.__internalListeners.has(msg.data.event)) {
+        const internalMsg = msg as MessageEvent<IP2PMessageData<MergedInternalEventMap>>;
+        this.__internalListeners.get(internalMsg.data.event)!.forEach((callback) => {
+          callback && callback(...internalMsg.data.payload);
         });
       }
     };
+  }
+
+  private initPeerConnectionListener() {
+    this.__connection.addEventListener('connectionstatechange', () => {
+      switch (this.__connection.connectionState) {
+        case 'disconnected': {
+          this.__invokeEvent('disconnected');
+          break;
+        }
+
+        case 'failed': {
+          this.__invokeEvent('failed');
+          break;
+        }
+      }
+    });
+
+    const syncClientId = (id: string) => {
+      this.__id = id;
+      this.internalOff('syncClientId', syncClientId);
+    };
+
+    this.internalOn('syncClientId', syncClientId);
   }
 
   clearListeners() {
@@ -68,8 +118,41 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     }
   }
 
+  private internalOn<E extends keyof MergedInternalEventMap, F extends MergedInternalEventMap[E]>(
+    event: E,
+    callback: F
+  ) {
+    if (!this.__internalListeners.has(event)) {
+      this.__internalListeners.set(event, new Set());
+    }
+    this.__internalListeners.get(event)!.add(callback);
+  }
+
+  private internalOff<E extends keyof MergedInternalEventMap, F extends MergedInternalEventMap[E]>(
+    event: E,
+    callback: F
+  ) {
+    if (!this.__internalListeners.has(event)) return;
+    if (!this.__internalListeners.get(event)!.has(callback)) return;
+    this.__internalListeners.get(event)!.delete(callback);
+    if (!this.__internalListeners.has(event) || this.__internalListeners.get(event)!.size < 1) {
+      this.__internalListeners.delete(event);
+    }
+  }
+
   emit<E extends keyof T, F extends Parameters<T[E]>>(event: E, ...args: F) {
     this.__dataLink.send(this.createData(event, null, ...args));
+  }
+
+  private __invokeEvent<E extends keyof MergedInternalEventMap, P extends Parameters<MergedInternalEventMap[E]>>(
+    event: E,
+    ...params: P
+  ) {
+    if (this.__listeners.get(event)) {
+      this.__listeners.get(event)!.forEach((callback) => {
+        callback && callback(...(params as any));
+      });
+    }
   }
 
   private createData<E extends keyof P2PConnectionEventMap<T>, F extends Parameters<P2PConnectionEventMap<T>[E]>>(
