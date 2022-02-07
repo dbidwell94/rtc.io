@@ -49,5 +49,5 @@ p2p.on('connection' (peer) => {
     })
 });
 
-p2p.connect("roomName");
+p2p.connect('roomName');
 ```
