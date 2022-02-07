@@ -1,9 +1,11 @@
 import { P2PConnection } from '../P2PConnection';
 import { ISignalServer } from '../SignalServer/types';
 
-export interface UserDefinedTypeMap {
-  [key: string]: any;
-}
+// export interface UserDefinedTypeMap {
+//   [key: string]: (...args: any) => void;
+// }
+
+export type UserDefinedTypeMap = Record<string, (...args: any) => void>;
 
 interface ListenerEventMap<T extends UserDefinedTypeMap> {
   connected: (connection: P2PConnection<T>) => void;
