@@ -117,13 +117,14 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
       this.pendingRemoteConnections.set(peer, conn);
     }
     await conn.connection.setRemoteDescription(offer);
-    const answer = await conn.connection.createAnswer();
-    if (conn.connection.signalingState !== 'stable') {
-      try {
+
+    try {
+      if (conn.connection.signalingState !== 'stable') {
+        const answer = await conn.connection.createAnswer();
         await conn.connection.setLocalDescription(answer);
-      } catch (_) {
-        // TODO: Handle this error
       }
+    } catch (err) {
+      console.warn(err);
     }
   }
 
