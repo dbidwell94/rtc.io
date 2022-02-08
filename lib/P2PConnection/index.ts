@@ -84,15 +84,19 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
   }
 
   private initPeerConnectionListener() {
-    this.__connection.addEventListener('connectionstatechange', () => {
-      switch (this.__connection.connectionState) {
+    this.__connection.addEventListener('iceconnectionstatechange', () => {
+      switch (this.__connection.iceConnectionState) {
         case 'disconnected': {
           this.__invokeEvent('disconnected');
+          this.__connection.close();
+          this.__dataLink.close();
           break;
         }
 
         case 'failed': {
           this.__invokeEvent('failed');
+          this.__connection.close();
+          this.__dataLink.close();
           break;
         }
       }
