@@ -119,10 +119,12 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     await conn.connection.setRemoteDescription(offer);
 
     try {
-      if (
-        conn.connection.signalingState === 'have-remote-offer' ||
-        conn.connection.signalingState === 'have-local-pranswer'
-      ) {
+      if (conn.connection.iceConnectionState !== 'connected' && conn.connection.signalingState !== 'stable') {
+        if (
+          conn.connection.signalingState !== 'have-local-pranswer' &&
+          conn.connection.signalingState !== 'have-remote-offer'
+        )
+          return;
         const answer = await conn.connection.createAnswer();
         await conn.connection.setLocalDescription(answer);
       }
@@ -138,9 +140,9 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     let dataChannel: RTCDataChannel;
 
     const handleConnectionStateChange = () => {
-      switch (conn.connectionState) {
+      switch (conn.iceConnectionState) {
         case 'connected': {
-          conn.removeEventListener('connectionstatechange', handleConnectionStateChange);
+          conn.removeEventListener('iceconnectionstatechange', handleConnectionStateChange);
           const handleDataChannel = (evt: RTCDataChannelEvent) => {
             dataChannel = evt.channel;
             const myConnectionObject = this.pendingRemoteConnections.get(peer)!;
@@ -159,18 +161,15 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
           break;
         }
 
-        case 'failed': {
+        case 'disconnected': {
           conn.close();
-          break;
-        }
-
-        case 'closed': {
           dataChannel?.close();
           this.removeConnection(peer);
+          break;
         }
       }
     };
-    conn.addEventListener('connectionstatechange', handleConnectionStateChange);
+    conn.addEventListener('iceconnectionstatechange', handleConnectionStateChange);
 
     const onIce = async () => {
       if (!conn.localDescription) return;
@@ -197,8 +196,8 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
-    peerConnection.addEventListener('connectionstatechange', async () => {
-      switch (peerConnection.connectionState) {
+    peerConnection.addEventListener('iceconnectionstatechange', () => {
+      switch (peerConnection.iceConnectionState) {
         case 'connected': {
           peerConnection.onicecandidate = null;
           const newConnection = new P2PConnection<Evt>(peerConnection, peerId, data, [roomName]);
@@ -210,22 +209,16 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
           this.connections.set(peerId, newConnection);
           break;
         }
-        case 'closed': {
+        case 'disconnected': {
+          peerConnection.close();
           data.close();
           this.removeConnection(peerId);
-          break;
-        }
-        case 'disconnected': {
-          break;
-        }
-        case 'failed': {
-          peerConnection.close();
           break;
         }
       }
     });
 
-    peerConnection.onicecandidate = async () => {
+    peerConnection.onicecandidate = () => {
       if (peerConnection.localDescription) {
         this.signalServer.emit('rtcOffer', peer, peerConnection.localDescription, roomName);
       }
