@@ -1,11 +1,12 @@
-import { UserDefinedTypeMap } from '@lib/Listener';
+import { UserDefinedTypeMap } from '../Listener';
+import Emitter, { IListenerMap } from '../P2PConnection/Emitter';
 import { v1, v4 } from 'uuid';
 
 type InternalEventMap = UserDefinedTypeMap & {
   syncClientId: (clientId: string) => void;
 };
 
-type ExternalInternalEventMap = {
+export type ExternalInternalEventMap = {
   disconnected: () => void;
   closed: () => void;
   failed: () => void;
@@ -13,36 +14,26 @@ type ExternalInternalEventMap = {
 
 type MergedInternalEventMap = InternalEventMap & ExternalInternalEventMap;
 
-type P2PConnectionEventMap<T extends UserDefinedTypeMap> = T & ExternalInternalEventMap;
-
 interface IP2PMessageData<T extends UserDefinedTypeMap> {
   toClientId: string | null;
   fromClientId: string;
+  namespace: string | null;
   event: keyof Partial<T>;
   payload: Parameters<T[keyof Partial<T>]>[];
 }
 
-export class P2PConnection<T extends UserDefinedTypeMap> {
-  private __id: string;
+export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
   private __connectedRooms: string[];
   private __connection: RTCPeerConnection;
-  private __dataLink: RTCDataChannel;
-  private __listeners: Map<keyof Partial<P2PConnectionEventMap<T>>, Set<Partial<P2PConnectionEventMap<T>>[keyof T]>>;
-  private __internalListeners: Map<
-    keyof Partial<MergedInternalEventMap>,
-    Set<Partial<MergedInternalEventMap>[keyof MergedInternalEventMap]>
-  >;
-  private __eventQueue: IP2PMessageData<T>[];
+  private __internalListeners: IListenerMap<MergedInternalEventMap>;
 
-  constructor(conn: RTCPeerConnection, id?: string, link?: RTCDataChannel, connectedRooms?: string[]) {
-    this.__id = id || P2PConnection.createP2PId();
-    this.__connection = conn;
-    if (!link) {
-      link = this.__connection.createDataChannel(this.__id);
-    }
+  constructor(conn: RTCPeerConnection, id: string, link: RTCDataChannel, connectedRooms?: string[]) {
+    super(link, id);
     if (!connectedRooms) {
       connectedRooms = [];
     }
+
+    this.__connection = conn;
     this.__dataLink = link;
     this.__listeners = new Map();
     this.__internalListeners = new Map();
@@ -56,11 +47,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     return this.__connectedRooms;
   }
 
-  get id() {
-    return this.__id;
-  }
-
-  private initDataChannelListener() {
+  protected initDataChannelListener() {
     this.__dataLink.onopen = () => {
       this.__eventQueue.forEach((item) => {
         this.__dataLink.send(JSON.stringify(item));
@@ -68,8 +55,10 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
       this.__eventQueue = [];
     };
 
-    this.__dataLink.onmessage = (msg: MessageEvent<string>) => {
+    this.__dataLink.addEventListener('message', (msg: MessageEvent<string>) => {
       const data = JSON.parse(msg.data) as IP2PMessageData<T | MergedInternalEventMap>;
+      // TODO: Handle custom namespace events
+      if (data.namespace) return;
       if (this.__listeners.has(data.event)) {
         this.__listeners.get(data.event)!.forEach((callback) => {
           callback && callback(...data.payload);
@@ -80,21 +69,21 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
           callback && callback(...internalMsg.payload);
         });
       }
-    };
+    });
   }
 
   private initPeerConnectionListener() {
     this.__connection.addEventListener('iceconnectionstatechange', () => {
       switch (this.__connection.iceConnectionState) {
         case 'disconnected': {
-          this.__invokeEvent('disconnected');
+          this.invokeEvent('disconnected');
           this.__connection.close();
           this.__dataLink.close();
           break;
         }
 
         case 'failed': {
-          this.__invokeEvent('failed');
+          this.invokeEvent('failed');
           this.__connection.close();
           this.__dataLink.close();
           break;
@@ -114,22 +103,6 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     Array.from(this.__listeners.keys()).forEach((event) => {
       this.__listeners.delete(event);
     });
-  }
-
-  on<E extends keyof P2PConnectionEventMap<T>, F extends P2PConnectionEventMap<T>[E]>(event: E, callback: F) {
-    if (!this.__listeners.has(event)) {
-      this.__listeners.set(event, new Set());
-    }
-    this.__listeners.get(event)!.add(callback);
-  }
-
-  off<E extends keyof P2PConnectionEventMap<T>, F extends P2PConnectionEventMap<T>[E]>(event: E, callback: F) {
-    if (!this.__listeners.has(event)) return;
-    if (!this.__listeners.get(event)!.has(callback)) return;
-    this.__listeners.get(event)!.delete(callback);
-    if (!this.__listeners.has(event) || this.__listeners.get(event)!.size < 1) {
-      this.__listeners.delete(event);
-    }
   }
 
   private internalOn<E extends keyof MergedInternalEventMap, F extends MergedInternalEventMap[E]>(
@@ -154,15 +127,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
     }
   }
 
-  emit<E extends keyof T, F extends Parameters<T[E]>>(event: E, ...args: F) {
-    if (this.__dataLink.readyState !== 'open') {
-      this.__eventQueue.push(this.createData(event, null, true, ...args));
-    } else {
-      this.__dataLink.send(this.createData(event, null, false, ...args));
-    }
-  }
-
-  private __invokeEvent<E extends keyof MergedInternalEventMap, P extends Parameters<MergedInternalEventMap[E]>>(
+  private invokeEvent<E extends keyof MergedInternalEventMap, P extends Parameters<MergedInternalEventMap[E]>>(
     event: E,
     ...params: P
   ) {
@@ -171,23 +136,6 @@ export class P2PConnection<T extends UserDefinedTypeMap> {
         callback && callback(...(params as any));
       });
     }
-  }
-
-  private createData<
-    E extends keyof P2PConnectionEventMap<T>,
-    F extends Parameters<P2PConnectionEventMap<T>[E]>,
-    B extends boolean
-  >(event: E, toClientId: string | null, outputObject: B, ...params: F): B extends true ? IP2PMessageData<T> : string {
-    const dataToSend = {
-      toClientId,
-      sendingId: this.id,
-      event,
-      payload: params,
-    };
-    if (outputObject) {
-      return dataToSend as any;
-    }
-    return JSON.stringify(dataToSend) as any;
   }
 
   static createP2PId() {
