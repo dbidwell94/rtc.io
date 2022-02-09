@@ -1,6 +1,7 @@
 import { UserDefinedTypeMap } from '../Listener';
-import Emitter, { IListenerMap } from '../P2PConnection/Emitter';
+import Emitter, { IListenerMap, IP2PMessageData } from '../P2PConnection/Emitter';
 import { v1, v4 } from 'uuid';
+import P2PNamespace, { P2PNamespaceBuilder } from './Namespace';
 
 type InternalEventMap = UserDefinedTypeMap & {
   syncClientId: (clientId: string) => void;
@@ -14,18 +15,11 @@ export type ExternalInternalEventMap = {
 
 type MergedInternalEventMap = InternalEventMap & ExternalInternalEventMap;
 
-interface IP2PMessageData<T extends UserDefinedTypeMap> {
-  toClientId: string | null;
-  fromClientId: string;
-  namespace: string | null;
-  event: keyof Partial<T>;
-  payload: Parameters<T[keyof Partial<T>]>[];
-}
-
 export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
   private __connectedRooms: string[];
   private __connection: RTCPeerConnection;
   private __internalListeners: IListenerMap<MergedInternalEventMap>;
+  private __namespaces: Set<P2PNamespace<any>>;
 
   constructor(conn: RTCPeerConnection, id: string, link: RTCDataChannel, connectedRooms?: string[]) {
     super(link, id);
@@ -37,6 +31,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
     this.__dataLink = link;
     this.__listeners = new Map();
     this.__internalListeners = new Map();
+    this.__namespaces = new Set();
     this.__eventQueue = [];
     this.initDataChannelListener();
     this.initPeerConnectionListener();
@@ -47,7 +42,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
     return this.__connectedRooms;
   }
 
-  protected initDataChannelListener() {
+  protected override initDataChannelListener() {
     this.__dataLink.onopen = () => {
       this.__eventQueue.forEach((item) => {
         this.__dataLink.send(JSON.stringify(item));
@@ -57,7 +52,7 @@ export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
 
     this.__dataLink.addEventListener('message', (msg: MessageEvent<string>) => {
       const data = JSON.parse(msg.data) as IP2PMessageData<T | MergedInternalEventMap>;
-      // TODO: Handle custom namespace events
+
       if (data.namespace) return;
       if (this.__listeners.has(data.event)) {
         this.__listeners.get(data.event)!.forEach((callback) => {
@@ -99,10 +94,29 @@ export class P2PConnection<T extends UserDefinedTypeMap> extends Emitter<T> {
     this.internalOn('syncClientId', syncClientId);
   }
 
-  clearListeners() {
+  /**
+   * Warning: Clearing listeners on the base P2P will also remove all namespace event listeners
+   */
+  public clearListeners() {
+    this.__namespaces.forEach((namespace) => {
+      namespace.clearListeners();
+      this.removeNamespace(namespace);
+    });
+
     Array.from(this.__listeners.keys()).forEach((event) => {
       this.__listeners.delete(event);
     });
+  }
+
+  registerNamespace<N extends UserDefinedTypeMap>(builder: P2PNamespaceBuilder<N>): void {
+    this.__namespaces.add(new P2PNamespace(this.__dataLink, this.id, builder));
+  }
+
+  removeNamespace<N extends UserDefinedTypeMap>(namespace: P2PNamespace<N>): void {
+    namespace.clearListeners();
+    if (this.__namespaces.has(namespace)) {
+      this.__namespaces.delete(namespace);
+    }
   }
 
   private internalOn<E extends keyof MergedInternalEventMap, F extends MergedInternalEventMap[E]>(

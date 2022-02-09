@@ -3,7 +3,7 @@ import { UserDefinedTypeMap } from '../Listener';
 
 export type IListenerMap<T extends ExternalInternalEventMap> = Map<keyof Partial<T>, Set<Partial<T>[keyof T]>>;
 
-interface IP2PMessageData<T extends UserDefinedTypeMap> {
+export interface IP2PMessageData<T extends UserDefinedTypeMap> {
   toClientId: string | null;
   fromClientId: string;
   namespace: string | null;
@@ -38,7 +38,6 @@ export default abstract class Emitter<T extends UserDefinedTypeMap> {
     this.__dataLink.addEventListener('message', (msg: MessageEvent<string>) => {
       const data = JSON.parse(msg.data) as IP2PMessageData<T>;
 
-      // TODO: Override this functionality in the P2PNamespace class
       if (data.namespace) return;
       if (this.__listeners.has(data.event)) {
         this.__listeners.get(data.event)!.forEach((callback) => {
@@ -66,6 +65,12 @@ export default abstract class Emitter<T extends UserDefinedTypeMap> {
     if (!this.__listeners.has(event) || this.__listeners.get(event)!.size < 1) {
       this.__listeners.delete(event);
     }
+  }
+
+  public clearListeners() {
+    Array.from(this.__listeners.keys()).forEach((event) => {
+      this.__listeners.delete(event);
+    });
   }
 
   public emit<E extends keyof ITypeMap, F extends Parameters<ITypeMap[E]>>(event: E, ...args: F) {
