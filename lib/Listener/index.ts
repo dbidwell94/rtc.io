@@ -28,9 +28,14 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
   private listeners: Map<keyof ListenerEventMap<Evt>, Set<ListenerEventMap<Evt>[keyof ListenerEventMap<Evt>]>>;
   private iceConfig: RTCConfiguration;
   private signalServer: IRtcSocketIoClient;
-
   private pendingHostConnections: Map<string, IPendingConnectionHost>;
   private pendingRemoteConnections: Map<string, IPendingConnectionClient>;
+
+  /**
+   * WARNING!!
+   * This property is experimental and intended for future use.
+   */
+  private __id: string;
 
   constructor(signalServer: IRtcSocketIoClient, iceConfig?: RTCConfiguration) {
     this.connections = new Map();
@@ -39,7 +44,16 @@ class Listener<Evt extends UserDefinedTypeMap = UserDefinedTypeMap> {
     this.signalServer = signalServer;
     this.pendingHostConnections = new Map();
     this.pendingRemoteConnections = new Map();
+    this.__id = P2PConnection.createP2PId();
     this.setupSignalListeners();
+  }
+
+  /**
+   * WARNING!!
+   * This property is experimental and is not yet synced with remote connections.
+   */
+  get UNSTABLE_id() {
+    return this.__id;
   }
 
   private setupSignalListeners() {
