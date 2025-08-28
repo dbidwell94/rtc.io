@@ -1,6 +1,6 @@
 import { UUID } from "../signaling";
 
-interface InternalEvents {
+export interface InternalEvents {
   connectionClosed: (peerId: UUID) => void;
 }
 

@@ -19,7 +19,7 @@ const freeIceServers = [
  * Represents an incoming connection request. If accepted, the process to connect
  * to the remote peer will take place.
  */
-interface RemoteOffer {
+export interface RemoteOffer {
   /**
    * This is the remote ID of the incoming offer. This will be a uuid-v4
    * and does not represent any state on the remote signaling server. You
@@ -42,7 +42,7 @@ interface RemoteOffer {
   reject: () => void;
 }
 
-interface InternalEvents<
+export interface InternalEvents<
   ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
 > {
   /**
@@ -131,7 +131,20 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   /**
-   * Registers an event handler for internal events
+   * Registers an event handler for internal events.
+   *
+   * @example
+   *  import {RTC} from 'rtc.io';
+   *
+   *  const rtcManager = new RTC(..);
+   *
+   *  rtcManager.on('connectionRequest', async (request) => {
+   *    if (request.remoteId === myExpectedId) {
+   *      await request.accept();
+   *    } else {
+   *      await request.reject();
+   *    }
+   *  })
    */
   public on<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
@@ -160,9 +173,19 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   /**
-   * Facilitates the connection to the signaling server.
+   * Facilitates the connection to the signaling server to the specified room.
+   *
+   * @example
+   * import { RTC } from 'rtc.io';
+   *
+   * const p2pManager = new RTC(signaler, "myRoom");
+   *
+   * // This will connect the manager to the signaler in the room
+   * // specified in the constructor.
+   * await p2pManager.connectToRoom();
+   *
    */
-  public async connect() {
+  public async connectToRoom() {
     const myPeerId = await this._signalingInterface.connectToRoom(
       this._roomName,
     );
@@ -172,6 +195,18 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
   /**
    * Gets a list of the peers from the signaling server in the current room.
+   *
+   * @example
+   * ```ts
+   * import { RTC } from 'rtc.io';
+   *
+   * const p2pManager = new RTC(signaler, 'myRoom');
+   *
+   * for (const remotePeer of p2pManager.getRoomPeers()) {
+   *  // This will send the connection request to the remote peer.
+   *  await p2pManager.connectToPeer(remotePeer);
+   * }
+   * ```
    */
   public getRoomPeers(): Array<UUID> {
     if (this._roomPeerId.isNone()) {

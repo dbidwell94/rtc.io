@@ -13,8 +13,10 @@
     "RTCPeerConnection",
     "P2P"
   ],
+  "main": "src/index.ts",
   "scripts": {
-    "test": "jest --forceExit"
+    "test": "jest --forceExit",
+    "doc": "typedoc"
   },
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
@@ -27,6 +29,7 @@
     "jest": "^30.1.1",
     "jest-environment-jsdom": "^30.1.1",
     "ts-jest": "^29.4.1",
+    "typedoc": "^0.28.11",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0"
   },

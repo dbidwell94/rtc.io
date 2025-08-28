@@ -22,8 +22,8 @@ describe("src/manager.ts", () => {
       }
     });
 
-    await p2p1.connect();
-    await p2p2.connect();
+    await p2p1.connectToRoom();
+    await p2p2.connectToRoom();
 
     await p2p1.connectToPeer(secondId);
 

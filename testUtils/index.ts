@@ -85,7 +85,7 @@ export class TestSignaler implements ClientSignaler {
     this.sendMessage(toPeer, "iceCandidate", candidate);
   }
 
-  close() {}
+  async close() {}
 }
 
 export interface WaitForOptions {
