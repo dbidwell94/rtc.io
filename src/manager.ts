@@ -38,8 +38,13 @@ interface InternalEvents<
   connectionRequest: (offer: RemoteOffer) => void;
 }
 
+interface PeerState {
+  connection: RTCPeerConnection;
+  data: Option<RTCDataChannel>;
+}
+
 export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
-  private _pendingPeers: Map<UUID, RTCPeerConnection>;
+  private _pendingPeers: Map<UUID, PeerState>;
   private _connectedPeers: Map<UUID, P2PConnection<ClientToPeerEvent>>;
   private _signalingInterface: ClientSignaler;
   private _roomName: string;
@@ -136,12 +141,14 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     };
   }
 
-  private onConnectionStateChanged(
-    peerId: UUID,
-    connection: RTCPeerConnection,
-    dataChannel: RTCDataChannel,
-  ) {
-    const sendOff = () => {
+  private onConnectionStateChanged(peerId: UUID) {
+    const peerStateOpt = option.unknown(this._pendingPeers.get(peerId));
+
+    if (peerStateOpt.isNone()) return () => {};
+
+    const { connection, data } = peerStateOpt.value;
+
+    const sendOff = (dataChannel: RTCDataChannel) => {
       dataChannel.onopen = null;
       this._events["connected"]?.forEach((callback) => {
         const clientConnection = new P2PConnection<ClientToPeerEvent>(
@@ -159,13 +166,17 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       switch (connection.connectionState) {
         case "connected": {
           // Make sure the data channel is also ready before handing off
+          if (data.isNone()) {
+            return;
+          }
+          const dataChannel = data.value;
 
           if (dataChannel.readyState !== "open") {
             dataChannel.onopen = () => {
-              sendOff();
+              sendOff(dataChannel);
             };
           } else {
-            sendOff();
+            sendOff(dataChannel);
           }
           break;
         }
@@ -186,12 +197,20 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     peerId: UUID,
     offer: RTCSessionDescriptionInit,
   ): Promise<Result<void>> {
-    if (this._pendingPeers.has(peerId)) {
+    if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {
       return result.err("Unable to accept offer on a pre-existing connection");
     }
     const connection = new RTCPeerConnection({ iceServers: this._iceServers });
-    const dataChannel = connection.createDataChannel(peerId);
-    this._pendingPeers.set(peerId, connection);
+    const peerState: PeerState = {
+      connection,
+      data: option.none(),
+    };
+    this._pendingPeers.set(peerId, peerState);
+    connection.ondatachannel = ({ channel }) => {
+      peerState.data = option.some(channel);
+      this.onConnectionStateChanged(peerId)();
+      connection.ondatachannel = null;
+    };
 
     connection.onicecandidate = ({ candidate }) => {
       const candidateOpt = option.unknown(candidate);
@@ -199,11 +218,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         this._signalingInterface.sendIceCandidate(peerId, candidateOpt.value);
       }
     };
-    connection.onconnectionstatechange = this.onConnectionStateChanged(
-      peerId,
-      connection,
-      dataChannel,
-    );
+
+    connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);
+
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
@@ -212,8 +229,8 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     await connection.setRemoteDescription(offer);
 
     const answer = await connection.createAnswer();
-    this._signalingInterface.sendAnswer(peerId, answer);
     await connection.setLocalDescription(answer);
+    this._signalingInterface.sendAnswer(peerId, answer);
 
     return result.ok(undefined);
   }
@@ -229,17 +246,16 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     }
     const connection = new RTCPeerConnection({ iceServers: this._iceServers });
     const dataChannel = connection.createDataChannel(peerId);
-    this._pendingPeers.set(peerId, connection);
+    this._pendingPeers.set(peerId, {
+      connection,
+      data: option.some(dataChannel),
+    });
     this._signalingInterface.on("answer", this.onAnswer(peerId, connection));
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
     );
-    connection.onconnectionstatechange = this.onConnectionStateChanged(
-      peerId,
-      connection,
-      dataChannel,
-    );
+    connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);
 
     const offer = await connection.createOffer({
       iceRestart: true,
@@ -254,7 +270,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   public async close() {
-    for (const [, conn] of this._pendingPeers) {
+    for (const [, { connection: conn }] of this._pendingPeers) {
       const closeConn = new Promise<void>((res) => {
         conn.onconnectionstatechange = () => {
           if (conn.connectionState === "closed") {
