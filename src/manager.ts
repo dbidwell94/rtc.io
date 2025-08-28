@@ -15,17 +15,29 @@ const freeIceServers = [
   "stun:stun4.l.google.com:5349",
 ];
 
+/**
+ * Represents an incoming connection request. If accepted, the process to connect
+ * to the remote peer will take place.
+ */
 interface RemoteOffer {
   /**
-   * This is the remote ID of the incoming offer.
+   * This is the remote ID of the incoming offer. This will be a uuid-v4
+   * and does not represent any state on the remote signaling server. You
+   * should have a local cache of a remote id and any other info you need
+   * in order to make a choice if you want to accept or reject the connection.
    */
   remoteId: UUID;
   /**
    * If called, this will start the P2P connection process.
+   * If the connection fails, a `connectionFailed` event will
+   * be fired on both clients. If successful,
+   * a `connected` event will be fired.
    */
   accept: () => Promise<Result<void>>;
   /**
    * If called, this will reject the incoming connection.
+   * This will fire the `connectionFailed` event on the
+   * requesting client.
    */
   reject: () => void;
 }
@@ -33,8 +45,21 @@ interface RemoteOffer {
 interface InternalEvents<
   ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
 > {
+  /**
+   * A new peer has connected. Any event listeners specific to the
+   * newly connected peer can be set on the `peer` parameter.
+   *
+   * @param peer - Represents a p2p networked connection to a remote peer
+   */
   connected: (peer: P2PConnection<ClientToPeerEvents>) => void;
+  /**
+   * The request to connect to the remote peer has failed.
+   */
   connectionFailed: (peerId: UUID) => void;
+  /**
+   * A new connection has been requested by a remote peer.You may
+   * inspect the `offer.remoteId` to view the uuid-v4 of the remote peer.
+   */
   connectionRequest: (offer: RemoteOffer) => void;
 }
 
@@ -43,6 +68,10 @@ interface PeerState {
   data: Option<RTCDataChannel>;
 }
 
+/**
+ * The base manager for all peer connections in the rtc.io library. This automatically handles
+ * signaling to and from remote peers in order to create a `P2PConnection`
+ */
 export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private _pendingPeers: Map<UUID, PeerState>;
   private _connectedPeers: Map<UUID, P2PConnection<ClientToPeerEvent>>;
@@ -52,11 +81,23 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private _iceServers: RTCIceServer[];
 
   private _events: {
-    [K in keyof InternalEvents<ClientToPeerEvent>]?: Array<
+    [K in keyof InternalEvents<ClientToPeerEvent>]?: Set<
       InternalEvents<ClientToPeerEvent>[K]
     >;
   } = Object.create(null);
 
+  /**
+   * Constructs a new instance of the RTC manager class. Requires caller to pass in anything
+   * that implements the `ClientSignaler` interface, and a roomName to connect to. Optionally,
+   * the user can also pass in an array of ICE servers, however if none is provided,
+   * the library will use default Google STUN servers.
+   *
+   * @param signalingInterface - Provides signaling between the manager and another set of peers.
+   * @param roomName - Helps to narrow down the list of peers to connect to. It is the job of the
+   * signalingInterface to provide a list of candiates in a particular room
+   * @param iceServers - An optional list of ICE servers. If not provided, will use default
+   * Google STUN servers
+   */
   constructor(
     signalingInterface: ClientSignaler,
     roomName: string,
@@ -89,15 +130,32 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     });
   }
 
-  public on<TKey extends string & keyof InternalEvents<ClientToPeerEvent>>(
+  /**
+   * Registers an event handler for internal events
+   */
+  public on<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
     handler: InternalEvents<ClientToPeerEvent>[TKey],
   ) {
     if (this._events[event]) {
-      this._events[event].push(handler);
+      this._events[event].add(handler);
     } else {
-      // TODO! - Fix the typing here so I don't have to cast as `never`
-      this._events[event] = [handler] as never;
+      // TODO! - Fix the typing here so I don't have to do this redundant cast.
+      this._events[event] = new Set([
+        handler,
+      ]) as (typeof this._events)[typeof event];
+    }
+  }
+
+  /**
+   * Removes an event listener for the specified internal event
+   */
+  public off<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
+    event: TKey,
+    handler: InternalEvents<ClientToPeerEvent>[TKey],
+  ) {
+    if (this._events[event]) {
+      this._events[event].delete(handler);
     }
   }
 
@@ -269,6 +327,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     return result.ok(undefined);
   }
 
+  /**
+   * Closes all open and pending connections, as well as
+   * the connection to the signal server if applicable.
+   */
   public async close() {
     for (const [, { connection: conn }] of this._pendingPeers) {
       const closeConn = new Promise<void>((res) => {
@@ -286,5 +348,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     for (const [, conn] of this._connectedPeers) {
       await conn.close();
     }
+
+    await this._signalingInterface.close();
   }
 }

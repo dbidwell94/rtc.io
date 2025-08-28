@@ -81,7 +81,7 @@ export class P2PConnection<
     this._data.send(JSON.stringify(message));
   }
 
-  on<TKey extends string & keyof EventMap<ClientToPeerEvents>>(
+  on<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
   ) {
