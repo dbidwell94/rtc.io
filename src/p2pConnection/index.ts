@@ -65,6 +65,10 @@ export class P2PConnection<
     });
   }
 
+  get id() {
+    return this._peerId;
+  }
+
   emit<TKey extends string & keyof ClientToPeerEvents>(
     event: TKey,
     ...args: Parameters<ClientToPeerEvents[TKey]>

@@ -68,6 +68,7 @@ describe("src/manager.ts", () => {
 
     await waitFor(() => {
       expect(onP2p1Message).toHaveBeenCalledTimes(1);
+      expect(onP2p1Message).toHaveBeenCalledWith(testMessage);
     });
 
     await Promise.all([p2p1.close(), p2p2.close()]);

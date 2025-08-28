@@ -13,7 +13,9 @@
     "RTCPeerConnection",
     "P2P"
   ],
-  "scripts": {},
+  "scripts": {
+    "test": "jest --forceExit"
+  },
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",
