@@ -1,4 +1,4 @@
-import { ClientSignaler, UUID, SignalerEvents } from "@rtcio/core";
+import { ClientSignaler, UUID, SignalerEvents } from "@rtcio/signaling";
 import { BroadcastChannel } from "broadcast-channel";
 import { option } from "@dbidwell94/ts-utils";
 

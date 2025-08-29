@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "main": "src/index.ts",
   "scripts": {},
+  "files": [
+    "dist",
+    "../../LICENSE"
+  ],
   "keywords": [
     "rtcio",
     "signal",
@@ -13,7 +17,6 @@
   "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
-    "@rtcio/core": "^0.1.0",
     "broadcast-channel": "^7.1.0"
   },
   "devDependencies": {

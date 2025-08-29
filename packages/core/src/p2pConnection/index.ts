@@ -1,4 +1,4 @@
-import { UUID } from "../signaling";
+import { UUID } from "@rtcio/signaling";
 
 export interface InternalEvents {
   connectionClosed: (peerId: UUID) => void;

@@ -4,8 +4,8 @@
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "files": [
     "dist",
+    "../../LICENSE",
     "package.json",
-    "LICENSE",
     "README.md"
   ],
   "keywords": [
@@ -37,6 +37,7 @@
     "wait-for-expect": "^4.0.0"
   },
   "dependencies": {
-    "@dbidwell94/ts-utils": "^1.0.0"
+    "@dbidwell94/ts-utils": "^1.0.0",
+    "@rtcio/signaling": "^0.1.0"
   }
 }

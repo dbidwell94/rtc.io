@@ -1,0 +1,15 @@
+{
+  "name": "@rtcio/signaling",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "scripts": {},
+  "keywords": [
+    "rtcio",
+    "signaling",
+    "RTC",
+    "WebRTC"
+  ],
+  "author": "Devin Bidwell <dbidwell94@biddydev.com>",
+  "license": "MIT",
+  "description": "A lightweight interface for use in creating custom signaling for use with the @rtcio ecosystem"
+}

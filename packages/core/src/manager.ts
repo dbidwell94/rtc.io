@@ -1,5 +1,5 @@
 import { P2PConnection, type VoidMethods } from "./p2pConnection";
-import { type ClientSignaler, type UUID } from "./signaling";
+import { type ClientSignaler, type UUID } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 
 const freeIceServers = [
