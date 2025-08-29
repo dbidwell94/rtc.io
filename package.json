@@ -1,5 +1,5 @@
 {
-  "name": "rtc.io-monorepo",
+  "name": "@rtcio/monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "test": "jest --forceExit",
-    "doc": "typedoc"
+    "doc": "typedoc",
+    "build": "tsc --build"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

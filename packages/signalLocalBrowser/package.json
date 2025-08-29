@@ -4,10 +4,13 @@
   "main": "src/index.ts",
   "scripts": {},
   "keywords": [
-    "rtcio"
+    "rtcio",
+    "signal",
+    "signal server",
+    "local"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Devin Bidwell <dbidwell94@biddydev.com>",
+  "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
     "@rtcio/core": "^0.1.0",

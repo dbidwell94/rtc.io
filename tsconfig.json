@@ -10,7 +10,8 @@
     "declarationMap": true,
     "target": "ES2020",
     "module": "commonjs",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "removeComments": true
   },
   "files": [],
   "references": [{ "path": "./packages/core" }]
