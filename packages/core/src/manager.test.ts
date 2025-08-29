@@ -1,7 +1,7 @@
 import waitFor from "wait-for-expect";
 import { RTC } from "./manager";
 import LocalSignal from "@rtcio/signal-local";
-import { UUID } from "./signaling";
+import { UUID } from "@rtcio/signaling";
 
 let signal1: LocalSignal;
 let signal2: LocalSignal;
@@ -10,6 +10,10 @@ let peer1Id: UUID;
 let peer2Id: UUID;
 
 const ROOM_NAME = "ROOM";
+
+async function closePeers(...peers: RTC<never>[]) {
+  await Promise.all(peers.map(async (peer) => await peer.close()));
+}
 
 describe("src/manager.ts", () => {
   beforeEach(async () => {
@@ -44,7 +48,7 @@ describe("src/manager.ts", () => {
       expect(secondConnected).toHaveBeenCalledTimes(1);
     });
 
-    await Promise.all([p2p1.close(), p2p2.close()]);
+    await closePeers(p2p1, p2p2);
   });
 
   it("Creates data channels and allows for messages to be passed between each other", async () => {
@@ -77,6 +81,6 @@ describe("src/manager.ts", () => {
       expect(onP2p1Message).toHaveBeenCalledWith(testMessage);
     });
 
-    await Promise.all([p2p1.close(), p2p2.close()]);
+    await closePeers(p2p1, p2p2);
   });
 });

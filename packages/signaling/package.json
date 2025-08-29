@@ -9,6 +9,10 @@
     "RTC",
     "WebRTC"
   ],
+  "files": [
+    "../../LICENSE",
+    "dist"
+  ],
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
   "description": "A lightweight interface for use in creating custom signaling for use with the @rtcio ecosystem"

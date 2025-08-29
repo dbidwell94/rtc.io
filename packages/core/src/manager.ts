@@ -7,12 +7,6 @@ const freeIceServers = [
   "stun:stun.l.google.com:5349",
   "stun:stun1.l.google.com:3478",
   "stun:stun1.l.google.com:5349",
-  "stun:stun2.l.google.com:19302",
-  "stun:stun2.l.google.com:5349",
-  "stun:stun3.l.google.com:3478",
-  "stun:stun3.l.google.com:5349",
-  "stun:stun4.l.google.com:19302",
-  "stun:stun4.l.google.com:5349",
 ];
 
 /**
@@ -308,7 +302,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     connection.onicecandidate = ({ candidate }) => {
       const candidateOpt = option.unknown(candidate);
       if (candidateOpt.isSome()) {
-        this._signalingInterface.sendIceCandidate(peerId, candidateOpt.value);
+        this._signalingInterface.sendIceCandidate(
+          peerId,
+          JSON.parse(JSON.stringify(candidateOpt.value)),
+        );
       }
     };
 

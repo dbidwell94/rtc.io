@@ -15,10 +15,7 @@
     "rtcio"
   ],
   "main": "src/index.ts",
-  "scripts": {
-    "test": "jest --forceExit",
-    "doc": "typedoc"
-  },
+  "scripts": {},
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",

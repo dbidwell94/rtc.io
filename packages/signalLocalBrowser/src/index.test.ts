@@ -1,6 +1,6 @@
 import waitFor from "wait-for-expect";
 import LocalSignalServer from "./index";
-import { UUID } from "@rtcio/core";
+import { UUID } from "@rtcio/signaling";
 
 let peer1: LocalSignalServer;
 let peer2: LocalSignalServer;
