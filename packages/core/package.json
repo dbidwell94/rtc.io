@@ -8,6 +8,9 @@
     "package.json",
     "README.md"
   ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "keywords": [
     "WebRTC",
     "RTCPeerConnection",

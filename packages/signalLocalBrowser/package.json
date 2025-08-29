@@ -7,6 +7,9 @@
     "dist",
     "../../LICENSE"
   ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "keywords": [
     "rtcio",
     "signal",
