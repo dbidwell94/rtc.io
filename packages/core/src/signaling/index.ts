@@ -35,7 +35,7 @@ export interface ClientSignaler {
    * This should be forwarded to the original offerer so the `connectionRejected`
    * event can be fired.
    */
-  rejectOffer: (from: UUID) => void;
+  rejectOffer: (toPeer: UUID) => void;
   /**
    * This will return all the UUIDs in the current room. The caller can then use the
    * retrieved id's to determine who to send an offer to.

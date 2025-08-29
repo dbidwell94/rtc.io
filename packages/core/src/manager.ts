@@ -1,6 +1,6 @@
-import { P2PConnection, VoidMethods } from "./p2pConnection";
-import { ClientSignaler, UUID } from "./signaling";
-import { Option, option, Result, result } from "@dbidwell94/ts-utils";
+import { P2PConnection, type VoidMethods } from "./p2pConnection";
+import { type ClientSignaler, type UUID } from "./signaling";
+import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 
 const freeIceServers = [
   "stun:stun.l.google.com:19302",

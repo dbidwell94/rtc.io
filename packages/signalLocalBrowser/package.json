@@ -1,0 +1,19 @@
+{
+  "name": "@rtcio/signal-local",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "scripts": {},
+  "keywords": [
+    "rtcio"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "A local only rtcio signal 'server'.",
+  "dependencies": {
+    "@rtcio/core": "^0.1.0",
+    "broadcast-channel": "^7.1.0"
+  },
+  "devDependencies": {
+    "wait-for-expect": "^4.0.0"
+  }
+}
