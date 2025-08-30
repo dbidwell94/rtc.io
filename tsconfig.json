@@ -18,6 +18,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/signalLocalBrowser" },
-    { "path": "./packages/signaling" }
+    { "path": "./packages/signaling" },
+    { "path": "./packages/socket-io" }
   ]
 }

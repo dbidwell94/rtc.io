@@ -1,20 +1,20 @@
 import waitFor from "wait-for-expect";
 import LocalSignalServer from "./index";
-import { UUID } from "@rtcio/signaling";
+import { PeerId } from "@rtcio/signaling";
 
 let peer1: LocalSignalServer;
 let peer2: LocalSignalServer;
 
-let peer1Id: UUID;
-let peer2Id: UUID;
+let peer1Id: PeerId;
+let peer2Id: PeerId;
 
 describe("src/index.ts", () => {
   beforeEach(async () => {
     peer1 = new LocalSignalServer();
     peer2 = new LocalSignalServer();
 
-    peer1Id = await peer1.connectToRoom();
-    peer2Id = await peer2.connectToRoom();
+    peer1Id = (await peer1.connectToRoom()).unwrap();
+    peer2Id = (await peer2.connectToRoom()).unwrap();
   });
 
   it("Passes rejected event to the correct peer", async () => {

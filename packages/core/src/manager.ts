@@ -1,5 +1,5 @@
 import { P2PConnection, type VoidMethods } from "./p2pConnection";
-import { type ClientSignaler, type UUID } from "@rtcio/signaling";
+import { type ClientSignaler, type PeerId } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 
 const freeIceServers = [
@@ -20,7 +20,7 @@ export interface RemoteOffer {
    * should have a local cache of a remote id and any other info you need
    * in order to make a choice if you want to accept or reject the connection.
    */
-  remoteId: UUID;
+  remoteId: PeerId;
   /**
    * If called, this will start the P2P connection process.
    * If the connection fails, a `connectionFailed` event will
@@ -49,7 +49,7 @@ export interface InternalEvents<
   /**
    * The request to connect to the remote peer has failed.
    */
-  connectionFailed: (peerId: UUID) => void;
+  connectionFailed: (peerId: PeerId) => void;
   /**
    * A new connection has been requested by a remote peer.You may
    * inspect the `offer.remoteId` to view the uuid-v4 of the remote peer.
@@ -67,11 +67,11 @@ interface PeerState {
  * signaling to and from remote peers in order to create a `P2PConnection`
  */
 export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
-  private _pendingPeers: Map<UUID, PeerState>;
-  private _connectedPeers: Map<UUID, P2PConnection<ClientToPeerEvent>>;
+  private _pendingPeers: Map<PeerId, PeerState>;
+  private _connectedPeers: Map<PeerId, P2PConnection<ClientToPeerEvent>>;
   private _signalingInterface: ClientSignaler;
   private _roomName: string;
-  private _roomPeerId: Option<UUID>;
+  private _roomPeerId: Option<PeerId>;
   private _iceServers: RTCIceServer[];
 
   private _events: {
@@ -179,12 +179,17 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * await p2pManager.connectToRoom();
    *
    */
-  public async connectToRoom() {
-    const myPeerId = await this._signalingInterface.connectToRoom(
+  public async connectToRoom(): Promise<Result<void>> {
+    const myPeerIdRes = await this._signalingInterface.connectToRoom(
       this._roomName,
     );
 
-    this._roomPeerId = option.some(myPeerId);
+    if (myPeerIdRes.isError()) {
+      return result.err(myPeerIdRes.error);
+    }
+
+    this._roomPeerId = option.some(myPeerIdRes.value);
+    return result.ok(undefined);
   }
 
   /**
@@ -202,7 +207,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * }
    * ```
    */
-  public getRoomPeers(): Array<UUID> {
+  public getRoomPeers(): Array<PeerId> {
     if (this._roomPeerId.isNone()) {
       return [];
     }
@@ -212,23 +217,23 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       .filter((peer) => peer !== myId);
   }
 
-  private onAnswer(peerId: UUID, connection: RTCPeerConnection) {
-    return async (sender: UUID, answer: RTCSessionDescriptionInit) => {
+  private onAnswer(peerId: PeerId, connection: RTCPeerConnection) {
+    return async (sender: PeerId, answer: RTCSessionDescriptionInit) => {
       if (sender !== peerId) return;
 
       await connection.setRemoteDescription(answer);
     };
   }
 
-  private onIceCandidate(peerId: UUID, connection: RTCPeerConnection) {
-    return async (sender: UUID, ice: RTCIceCandidateInit) => {
+  private onIceCandidate(peerId: PeerId, connection: RTCPeerConnection) {
+    return async (sender: PeerId, ice: RTCIceCandidateInit) => {
       if (sender !== peerId) return;
 
       await connection.addIceCandidate(ice);
     };
   }
 
-  private onConnectionStateChanged(peerId: UUID) {
+  private onConnectionStateChanged(peerId: PeerId) {
     const peerStateOpt = option.unknown(this._pendingPeers.get(peerId));
 
     if (peerStateOpt.isNone()) return () => {};
@@ -281,7 +286,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   private async acceptOffer(
-    peerId: UUID,
+    peerId: PeerId,
     offer: RTCSessionDescriptionInit,
   ): Promise<Result<void>> {
     if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {
@@ -330,7 +335,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * `connected` event will be fired. If failed, a `connectionFailed` event will
    * be fired instead.
    */
-  public async connectToPeer(peerId: UUID): Promise<Result<void>> {
+  public async connectToPeer(peerId: PeerId): Promise<Result<void>> {
     if (this._pendingPeers.has(peerId)) {
       return result.err("Peer already has or is pending a connection");
     }

@@ -1,13 +1,13 @@
-import { ClientSignaler, UUID, SignalerEvents } from "@rtcio/signaling";
+import { ClientSignaler, PeerId, SignalerEvents } from "@rtcio/signaling";
 import { BroadcastChannel } from "broadcast-channel";
-import { option } from "@dbidwell94/ts-utils";
+import { option, result, Result } from "@dbidwell94/ts-utils";
 
 /**
  * A message structure for communication over the BroadcastChannel.
  */
 interface P2PMessage {
-  targetId: UUID;
-  senderId: UUID;
+  targetId: PeerId;
+  senderId: PeerId;
   event: keyof SignalerEvents;
   payload: Parameters<SignalerEvents[keyof SignalerEvents]>;
 }
@@ -15,7 +15,7 @@ interface P2PMessage {
 export default class LocalSignalServer implements ClientSignaler {
   private _channel: BroadcastChannel<P2PMessage>;
   private _emitter: EventTarget;
-  private _ownId: UUID;
+  private _ownId: PeerId;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private eventHandlers: Map<Function, EventListener> = new Map();
@@ -38,29 +38,29 @@ export default class LocalSignalServer implements ClientSignaler {
     };
   }
 
-  getRoomPeers(): Array<UUID> {
+  getRoomPeers(): Array<PeerId> {
     console.warn("LocalSignalServer does not support `getRoomPeers`");
 
     return [];
   }
 
-  async connectToRoom(): Promise<UUID> {
-    return this._ownId;
+  async connectToRoom(): Promise<Result<PeerId>> {
+    return result.ok(this._ownId);
   }
 
-  sendOffer(toPeer: UUID, offer: RTCSessionDescriptionInit): void {
+  sendOffer(toPeer: PeerId, offer: RTCSessionDescriptionInit): void {
     this.sendMessage(toPeer, "offer", this._ownId, offer);
   }
 
-  sendAnswer(toPeer: UUID, answer: RTCSessionDescriptionInit): void {
+  sendAnswer(toPeer: PeerId, answer: RTCSessionDescriptionInit): void {
     this.sendMessage(toPeer, "answer", this._ownId, answer);
   }
 
-  sendIceCandidate(toPeer: UUID, candidate: RTCIceCandidateInit): void {
+  sendIceCandidate(toPeer: PeerId, candidate: RTCIceCandidateInit): void {
     this.sendMessage(toPeer, "iceCandidate", this._ownId, candidate);
   }
 
-  rejectOffer(toPeer: UUID): void {
+  rejectOffer(toPeer: PeerId): void {
     this.sendMessage(toPeer, "connectionRejected", this._ownId);
   }
 
@@ -96,7 +96,7 @@ export default class LocalSignalServer implements ClientSignaler {
   async close() {}
 
   private sendMessage<TKey extends keyof SignalerEvents>(
-    targetId: UUID,
+    targetId: PeerId,
     event: TKey,
     ...payload: Parameters<SignalerEvents[TKey]>
   ) {

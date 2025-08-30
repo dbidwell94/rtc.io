@@ -1,13 +1,13 @@
 import waitFor from "wait-for-expect";
 import { RTC } from "./manager";
 import LocalSignal from "@rtcio/signal-local";
-import { UUID } from "@rtcio/signaling";
+import { PeerId } from "@rtcio/signaling";
 
 let signal1: LocalSignal;
 let signal2: LocalSignal;
 
-let peer1Id: UUID;
-let peer2Id: UUID;
+let peer1Id: PeerId;
+let peer2Id: PeerId;
 
 const ROOM_NAME = "ROOM";
 
@@ -20,8 +20,8 @@ describe("src/manager.ts", () => {
     signal1 = new LocalSignal();
     signal2 = new LocalSignal();
 
-    peer1Id = await signal1.connectToRoom();
-    peer2Id = await signal2.connectToRoom();
+    peer1Id = (await signal1.connectToRoom()).unwrap();
+    peer2Id = (await signal2.connectToRoom()).unwrap();
   });
 
   it("Connects 2 peers together", async () => {

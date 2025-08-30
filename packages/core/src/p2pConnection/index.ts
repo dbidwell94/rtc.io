@@ -1,7 +1,7 @@
-import { UUID } from "@rtcio/signaling";
+import { PeerId } from "@rtcio/signaling";
 
 export interface InternalEvents {
-  connectionClosed: (peerId: UUID) => void;
+  connectionClosed: (peerId: PeerId) => void;
 }
 
 export type VoidMethods<T> = {
@@ -26,12 +26,12 @@ export class P2PConnection<
 
   private _connection: RTCPeerConnection;
   private _data: RTCDataChannel;
-  private _peerId: UUID;
+  private _peerId: PeerId;
 
   constructor(
     connection: RTCPeerConnection,
     dataChannel: RTCDataChannel,
-    peerId: UUID,
+    peerId: PeerId,
   ) {
     this._connection = connection;
     this._peerId = peerId;
