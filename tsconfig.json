@@ -19,6 +19,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/signalLocalBrowser" },
     { "path": "./packages/signaling" },
-    { "path": "./packages/socket-io" }
+    { "path": "./packages/socket-io-client" },
+    { "path": "./packages/socket-io-server" }
   ]
 }

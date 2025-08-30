@@ -32,8 +32,8 @@ export default class SocketIoSignaler implements ClientSignaler {
   // awaiting this promise ensures that the client is connected to the signal server
   private _ensureConnected: Promise<void>;
 
-  constructor(baseUrl: string) {
-    this._socket = io(baseUrl);
+  constructor(...params: Parameters<typeof io>) {
+    this._socket = io(...params);
 
     this._ensureConnected = new Promise((res, rej) => {
       this._socket.on("connect_error", (err) => {

@@ -1,16 +1,16 @@
 import { option } from "@dbidwell94/ts-utils";
-import { PeerId } from "@rtcio/signaling";
+import { type PeerId } from "@rtcio/signaling";
 import {
-  SocketIoClientToServerEvent,
-  SocketIoServerToClientEvent,
+  type SocketIoClientToServerEvent,
+  type SocketIoServerToClientEvent,
 } from "@rtcio/socket-io-client";
-import { Server, ServerOptions, Socket } from "socket.io";
+import { Server, type Socket } from "socket.io";
 
-export function rtcioServer(opts?: Partial<ServerOptions>) {
+export function rtcioServer(...args: ConstructorParameters<typeof Server>) {
   const io = new Server<
     SocketIoClientToServerEvent,
     SocketIoServerToClientEvent
-  >(opts);
+  >(...args);
 
   const idsToPeers: Map<
     PeerId,
