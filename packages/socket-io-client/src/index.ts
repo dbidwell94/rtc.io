@@ -8,7 +8,7 @@ import {
   Some,
 } from "@dbidwell94/ts-utils";
 
-interface SocketIoClientToServerEvent {
+export interface SocketIoClientToServerEvent {
   connectToRoom: (roomName: string) => void;
   offer: (toPeer: PeerId, offer: RTCSessionDescriptionInit) => void;
   answer: (toPeer: PeerId, answer: RTCSessionDescriptionInit) => void;
@@ -16,8 +16,9 @@ interface SocketIoClientToServerEvent {
   rejectOffer: (toPeer: PeerId) => void;
 }
 
-interface SocketIoServerToClientEvent extends SignalerEvents {
+export interface SocketIoServerToClientEvent extends SignalerEvents {
   newPeerConnected: (clientId: PeerId) => void;
+  peerLeft: (clientId: PeerId) => void;
 }
 
 export default class SocketIoSignaler implements ClientSignaler {
@@ -52,6 +53,10 @@ export default class SocketIoSignaler implements ClientSignaler {
   private setupListeners() {
     this._socket.on("newPeerConnected", (id) => {
       this._roomClients.add(id);
+    });
+
+    this._socket.on("peerLeft", (id) => {
+      this._roomClients.delete(id);
     });
 
     this._socket.on("connect_error", (err) => {
