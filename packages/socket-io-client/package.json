@@ -19,7 +19,7 @@
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
-  "description": "An implementation of the @rtcio/signaling Signaler for a socket.io client",
+  "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
     "@rtcio/signaling": "file:../signaling",
     "socket.io-client": "^4.8",
