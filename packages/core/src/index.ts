@@ -1,4 +1,4 @@
-export { RTC } from "./manager";
+export { RTC, type InternalEvents as RTCInternalEvents } from "./manager";
 export {
   type P2PConnection,
   type VoidMethods,
