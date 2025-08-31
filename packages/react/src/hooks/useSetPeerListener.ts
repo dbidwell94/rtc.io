@@ -46,12 +46,3 @@ export function createPeerListener<TEvents extends VoidMethods<TEvents>>() {
 
   return useSetPeerListener;
 }
-
-interface TestInterface {
-  item1: number;
-  item2: string;
-  connectionClosed: boolean;
-  item3: () => void;
-}
-
-const usePeerListener = createPeerListener<TestInterface>();
