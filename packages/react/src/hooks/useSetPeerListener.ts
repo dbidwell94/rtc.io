@@ -1,8 +1,12 @@
-import { type P2PConnectionEventMap, type PeerId } from "@rtcio/core";
+import {
+  VoidMethods,
+  type P2PConnectionEventMap,
+  type PeerId,
+} from "@rtcio/core";
 import { useContext, useEffect, useRef } from "react";
 import { type P2PContext, p2pContext } from "../provider";
 
-export function createPeerListener<TEvents>() {
+export function createPeerListener<TEvents extends VoidMethods<TEvents>>() {
   const useSetPeerListener = <
     TKey extends keyof P2PConnectionEventMap<TEvents>,
   >(
@@ -42,3 +46,12 @@ export function createPeerListener<TEvents>() {
 
   return useSetPeerListener;
 }
+
+interface TestInterface {
+  item1: number;
+  item2: string;
+  connectionClosed: boolean;
+  item3: () => void;
+}
+
+const usePeerListener = createPeerListener<TestInterface>();
