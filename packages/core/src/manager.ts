@@ -179,7 +179,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * await p2pManager.connectToRoom();
    *
    */
-  public async connectToRoom(): Promise<Result<void>> {
+  public async connectToRoom(): Promise<Result<PeerId>> {
     const myPeerIdRes = await this._signalingInterface.connectToRoom(
       this._roomName,
     );
@@ -189,7 +189,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     }
 
     this._roomPeerId = option.some(myPeerIdRes.value);
-    return result.ok(undefined);
+    return result.ok(myPeerIdRes.value);
   }
 
   /**

@@ -1,0 +1,25 @@
+{
+  "name": "@rtcio/react",
+  "version": "0.1.0",
+  "scripts": {},
+  "exports": [
+    "./src/index.ts"
+  ],
+  "keywords": [
+    "react",
+    "webrtc",
+    "rtcio",
+    "p2p"
+  ],
+  "author": "Devin Bidwell <dbidwell94@biddydev.com>",
+  "license": "MIT",
+  "description": "React integration for @rtcio/core",
+  "dependencies": {
+    "react": "^19.1.1",
+    "@rtcio/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@rtcio/signaling": "workspace:*"
+  }
+}

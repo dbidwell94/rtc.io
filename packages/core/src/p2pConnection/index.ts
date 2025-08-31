@@ -5,10 +5,11 @@ export interface InternalEvents {
 }
 
 export type VoidMethods<T> = {
-  [K in keyof T]: (...args: never[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in keyof T]: (...args: any[]) => void;
 };
 
-type EventMap<T> = InternalEvents & T;
+export type EventMap<T> = InternalEvents & T;
 
 interface InternalMessageEvent<Evts extends VoidMethods<Evts>> {
   event: keyof Evts;
@@ -92,7 +93,7 @@ export class P2PConnection<
     }
   }
 
-  off<TKey extends string & keyof EventMap<ClientToPeerEvents>>(
+  off<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
   ) {
