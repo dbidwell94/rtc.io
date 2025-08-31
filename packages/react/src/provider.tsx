@@ -13,9 +13,7 @@ import { option, Option } from "@dbidwell94/ts-utils";
 export interface P2PContext<TEvents> {
   rtc: Option<RTC<TEvents>>;
   rtcUpdatedCount: number;
-  peers: {
-    [peerId: PeerId]: P2PConnection<TEvents>;
-  };
+  peers: Map<PeerId, P2PConnection<TEvents>>;
   localId: Option<PeerId>;
 }
 
@@ -36,7 +34,7 @@ export default function Provider<TEvents>({
 }: ProviderProps) {
   const providerMounted = useRef(true);
 
-  const peers = useRef<P2PContext<TEvents>["peers"]>({});
+  const peers = useRef<P2PContext<TEvents>["peers"]>(new Map());
   const rtc = useRef<P2PContext<TEvents>["rtc"]>(option.none());
 
   const [localId, setLocalId] = useState<Option<PeerId>>(option.none());
@@ -65,10 +63,13 @@ export default function Provider<TEvents>({
       }
 
       rtcInstance.on("connected", (newPeer) => {
-        peers.current[newPeer.id] = newPeer;
+        peers.current.set(newPeer.id, newPeer);
         setPeersUpdatedCount((count) => count + 1);
 
-        newPeer.on("connectionClosed", (peerId) => {});
+        newPeer.on("connectionClosed", (peerId) => {
+          peers.current.delete(peerId);
+          setPeersUpdatedCount((count) => count + 1);
+        });
       });
 
       if (providerMounted.current) {
@@ -84,7 +85,7 @@ export default function Provider<TEvents>({
       (async () => {
         await rtcInstance.close();
         rtc.current = option.none();
-        peers.current = {};
+        peers.current = new Map();
 
         if (providerMounted.current) {
           setRtcUpdatedCount((count) => count + 1);
