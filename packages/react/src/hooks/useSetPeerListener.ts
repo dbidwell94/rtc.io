@@ -1,13 +1,9 @@
-import {
-  type VoidMethods,
-  type P2PConnectionEventMap,
-  type PeerId,
-} from "@rtcio/core";
+import { type P2PConnectionEventMap, type PeerId } from "@rtcio/core";
 import { useContext, useEffect, useRef } from "react";
 import { type P2PContext, p2pContext } from "../provider";
 
 export default function useSetPeerListener<
-  TEvents extends VoidMethods<TEvents>,
+  TEvents,
   TKey extends keyof P2PConnectionEventMap<TEvents>,
 >(event: TKey, callback: P2PConnectionEventMap<TEvents>[TKey]) {
   const currentCallback = useRef(callback);

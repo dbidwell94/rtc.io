@@ -5,20 +5,22 @@ export interface InternalEvents {
 }
 
 export type VoidMethods<T> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K in keyof T]: (...args: any[]) => void;
+  [K in keyof T]: T extends keyof InternalEvents
+    ? never
+    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      T[K] extends (...args: any[]) => void
+      ? T[K]
+      : never;
 };
 
-export type EventMap<T> = InternalEvents & T;
+export type EventMap<T> = VoidMethods<T> & InternalEvents;
 
-interface InternalMessageEvent<Evts extends VoidMethods<Evts>> {
-  event: keyof Evts;
-  args: Parameters<Evts[keyof Evts]>;
+interface InternalMessageEvent<Evts> {
+  event: keyof VoidMethods<Evts>;
+  args: Parameters<VoidMethods<Evts>[keyof VoidMethods<Evts>]>;
 }
 
-export class P2PConnection<
-  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
-> {
+export class P2PConnection<ClientToPeerEvents> {
   private _events: {
     [K in keyof EventMap<ClientToPeerEvents>]?: Set<
       EventMap<ClientToPeerEvents>[K]
@@ -72,7 +74,7 @@ export class P2PConnection<
 
   emit<TKey extends string & keyof ClientToPeerEvents>(
     event: TKey,
-    ...args: Parameters<ClientToPeerEvents[TKey]>
+    ...args: Parameters<VoidMethods<ClientToPeerEvents>[TKey]>
   ) {
     const message: InternalMessageEvent<ClientToPeerEvents> = {
       event,
@@ -120,3 +122,15 @@ export class P2PConnection<
     await closeConn;
   }
 }
+
+interface TestInterface {
+  item: 123;
+  item2: (item: string) => void;
+  item3: (item3: string) => string;
+}
+
+const p2p = new P2PConnection<unknown>(
+  null as never,
+  null as never,
+  null as never,
+);

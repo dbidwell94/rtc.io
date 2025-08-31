@@ -36,9 +36,7 @@ export interface RemoteOffer {
   reject: () => void;
 }
 
-export interface InternalEvents<
-  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
-> {
+export interface InternalEvents<ClientToPeerEvents> {
   /**
    * A new peer has connected. Any event listeners specific to the
    * newly connected peer can be set on the `peer` parameter.
@@ -66,7 +64,7 @@ interface PeerState {
  * The base manager for all peer connections in the rtc.io library. This automatically handles
  * signaling to and from remote peers in order to create a `P2PConnection`
  */
-export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
+export class RTC<ClientToPeerEvent> {
   private _pendingPeers: Map<PeerId, PeerState>;
   private _connectedPeers: Map<PeerId, P2PConnection<ClientToPeerEvent>>;
   private _signalingInterface: ClientSignaler;
@@ -75,8 +73,8 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private _iceServers: RTCIceServer[];
 
   private _events: {
-    [K in keyof InternalEvents<ClientToPeerEvent>]?: Set<
-      InternalEvents<ClientToPeerEvent>[K]
+    [K in keyof InternalEvents<VoidMethods<ClientToPeerEvent>>]?: Set<
+      InternalEvents<VoidMethods<ClientToPeerEvent>>[K]
     >;
   } = Object.create(null);
 
@@ -140,9 +138,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    *    }
    *  })
    */
-  public on<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
+  public on<TKey extends keyof InternalEvents<VoidMethods<ClientToPeerEvent>>>(
     event: TKey,
-    handler: InternalEvents<ClientToPeerEvent>[TKey],
+    handler: InternalEvents<VoidMethods<ClientToPeerEvent>>[TKey],
   ) {
     if (this._events[event]) {
       this._events[event].add(handler);
@@ -157,9 +155,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   /**
    * Removes an event listener for the specified internal event
    */
-  public off<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
+  public off<TKey extends keyof InternalEvents<VoidMethods<ClientToPeerEvent>>>(
     event: TKey,
-    handler: InternalEvents<ClientToPeerEvent>[TKey],
+    handler: InternalEvents<VoidMethods<ClientToPeerEvent>>[TKey],
   ) {
     if (this._events[event]) {
       this._events[event].delete(handler);
@@ -243,11 +241,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     const sendOff = (dataChannel: RTCDataChannel) => {
       dataChannel.onopen = null;
       this._events["connected"]?.forEach((callback) => {
-        const clientConnection = new P2PConnection<ClientToPeerEvent>(
-          connection,
-          dataChannel,
-          peerId,
-        );
+        const clientConnection = new P2PConnection<
+          VoidMethods<ClientToPeerEvent>
+        >(connection, dataChannel, peerId);
         this._pendingPeers.delete(peerId);
         this._connectedPeers.set(peerId, clientConnection);
         callback(clientConnection);

@@ -1,4 +1,4 @@
-import { P2PConnection, RTC, VoidMethods } from "@rtcio/core";
+import { P2PConnection, RTC } from "@rtcio/core";
 import { ClientSignaler, PeerId } from "@rtcio/signaling";
 import React, {
   createContext,
@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { option, Option } from "@dbidwell94/ts-utils";
 
-export interface P2PContext<TEvents extends VoidMethods<TEvents>> {
+export interface P2PContext<TEvents> {
   rtc: Option<RTC<TEvents>>;
   rtcUpdatedCount: number;
   peers: {
@@ -21,19 +21,19 @@ export interface P2PContext<TEvents extends VoidMethods<TEvents>> {
 
 export const p2pContext = createContext<P2PContext<never>>(null as never);
 
-export interface ProviderProps<TEvents extends VoidMethods<TEvents>> {
+export interface ProviderProps {
   signaler: ClientSignaler;
   children: ReactNode;
   roomName: string;
   iceServers?: RTCIceServer[];
 }
 
-export default function Provider<TEvents extends VoidMethods<TEvents>>({
+export default function Provider<TEvents>({
   children,
   signaler,
   roomName,
   iceServers,
-}: ProviderProps<TEvents>) {
+}: ProviderProps) {
   const providerMounted = useRef(true);
 
   const peers = useRef<P2PContext<TEvents>["peers"]>({});
@@ -67,6 +67,8 @@ export default function Provider<TEvents extends VoidMethods<TEvents>>({
       rtcInstance.on("connected", (newPeer) => {
         peers.current[newPeer.id] = newPeer;
         setPeersUpdatedCount((count) => count + 1);
+
+        newPeer.on("connectionClosed", (peerId) => {});
       });
 
       if (providerMounted.current) {
