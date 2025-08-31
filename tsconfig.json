@@ -20,6 +20,7 @@
     { "path": "./packages/signalLocalBrowser" },
     { "path": "./packages/signaling" },
     { "path": "./packages/socket-io-client" },
-    { "path": "./packages/socket-io-server" }
+    { "path": "./packages/socket-io-server" },
+    { "path": "./packages/react" }
   ]
 }

@@ -5,15 +5,21 @@ export interface InternalEvents {
 }
 
 export type VoidMethods<T> = {
-  [K in keyof T]: (...args: never[]) => void;
+  [K in keyof T as K extends keyof InternalEvents
+    ? never
+    : T[K] extends (...args: unknown[]) => void
+      ? K
+      : never]: T[K];
 };
 
-type EventMap<T> = InternalEvents & T;
+export type EventMap<T> = T & InternalEvents;
 
-interface InternalMessageEvent<Evts extends VoidMethods<Evts>> {
-  event: keyof Evts;
-  args: Parameters<Evts[keyof Evts]>;
-}
+type InternalMessageEvent<T extends VoidMethods<T>> = {
+  [K in keyof T]: {
+    event: K;
+    args: T[K] extends (...args: unknown[]) => void ? Parameters<T[K]> : never;
+  };
+}[keyof T];
 
 export class P2PConnection<
   ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
@@ -69,18 +75,28 @@ export class P2PConnection<
     return this._peerId;
   }
 
-  emit<TKey extends string & keyof ClientToPeerEvents>(
+  emit<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     ...args: Parameters<ClientToPeerEvents[TKey]>
   ) {
-    const message: InternalMessageEvent<ClientToPeerEvents> = {
+    // TODO! handle the creation of this message better so that I don't have to
+    // cast `as unknown as T` :puke:.
+    const message = {
       event,
       args,
-    };
+    } as unknown as InternalMessageEvent<ClientToPeerEvents>;
 
     this._data.send(JSON.stringify(message));
   }
 
+  on<TKey extends keyof InternalEvents>(
+    event: TKey,
+    callback: InternalEvents[TKey],
+  ): void;
+  on<TKey extends keyof ClientToPeerEvents>(
+    event: TKey,
+    callback: ClientToPeerEvents[TKey],
+  ): void;
   on<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
@@ -92,7 +108,15 @@ export class P2PConnection<
     }
   }
 
-  off<TKey extends string & keyof EventMap<ClientToPeerEvents>>(
+  off<TKey extends keyof InternalEvents>(
+    event: TKey,
+    callback: InternalEvents[TKey],
+  ): void;
+  off<TKey extends keyof ClientToPeerEvents>(
+    event: TKey,
+    callback: ClientToPeerEvents[TKey],
+  ): void;
+  off<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
   ) {
