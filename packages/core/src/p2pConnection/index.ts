@@ -122,15 +122,3 @@ export class P2PConnection<ClientToPeerEvents> {
     await closeConn;
   }
 }
-
-interface TestInterface {
-  item: 123;
-  item2: (item: string) => void;
-  item3: (item3: string) => string;
-}
-
-const p2p = new P2PConnection<unknown>(
-  null as never,
-  null as never,
-  null as never,
-);
