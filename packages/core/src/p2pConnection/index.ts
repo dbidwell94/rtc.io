@@ -6,12 +6,16 @@ export interface FileMetadata extends JsonObject {
   type: File["type"];
   lastModified: File["lastModified"];
   size: File["size"];
+  _internalIsFile: true;
 }
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
   data: <T extends JsonValue>(metadata: T, binaryData: ArrayBuffer) => void;
-  file: (metadata: FileMetadata, binaryData: Blob) => void;
+  file: (
+    metadata: Omit<FileMetadata, "____internal_____isFile">,
+    binaryData: Blob,
+  ) => void;
 }
 
 export type VoidMethods<T> = {
@@ -97,23 +101,20 @@ export class P2PConnection<
   }
 
   private handleBinaryData(data: ArrayBuffer) {
-    const optData = this._chunker.receiveChunk(data);
+    const optData = this._chunker.receiveChunk<FileMetadata | JsonValue>(data);
 
     if (optData.isSome()) {
       const { data, metadata } = optData.value;
 
       if (
         metadata &&
-        "size" in metadata &&
-        "name" in metadata &&
-        "type" in metadata &&
-        "lastModified" in metadata
+        typeof metadata === "object" &&
+        "_internalIsFile" in metadata
       ) {
-        const fileMetadata: FileMetadata = metadata;
         const fileBlob = new Blob([data]);
 
         this._events["file"]?.forEach((callback) => {
-          callback(fileMetadata, fileBlob);
+          callback(metadata, fileBlob);
         });
         return;
       }
@@ -164,6 +165,7 @@ export class P2PConnection<
       size: file.size,
       lastModified: file.lastModified,
       type: file.type,
+      _internalIsFile: true,
     };
 
     this.sendRaw(await file.arrayBuffer(), fileMetadata);
