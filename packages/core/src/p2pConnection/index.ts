@@ -1,4 +1,5 @@
 import { PeerId } from "@rtcio/signaling";
+import { BinaryChunker } from "./binaryData";
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
@@ -38,7 +39,7 @@ export class P2PConnection<
     >;
   } = Object.create(null);
 
-  private _dataChunks: Map<string, ArrayBuffer[]> = new Map();
+  private _chunker: BinaryChunker;
   private _connection: RTCPeerConnection;
   private _data: RTCDataChannel;
   private _peerId: PeerId;
@@ -51,6 +52,8 @@ export class P2PConnection<
     this._connection = connection;
     this._peerId = peerId;
     this._data = dataChannel;
+    this._chunker = new BinaryChunker();
+    this._data.binaryType = "arraybuffer";
 
     this._data.onmessage = ({ data }) => {
       switch (typeof data) {
@@ -60,7 +63,8 @@ export class P2PConnection<
         }
         case "object": {
           if (data instanceof ArrayBuffer) {
-            // TODO! Handle binary data with the new BinaryChunker
+            this.handleBinaryData(data);
+            break;
           }
           console.error("Unknown object type received from RTCDataChannel");
           break;
@@ -83,6 +87,16 @@ export class P2PConnection<
         }
       }
     };
+  }
+
+  private handleBinaryData(data: ArrayBuffer) {
+    const optData = this._chunker.receiveChunk(data);
+
+    if (optData.isSome()) {
+      this._events["data"]?.forEach((callback) => {
+        callback(optData.value);
+      });
+    }
   }
 
   private handleStringData(data: string) {
@@ -109,6 +123,10 @@ export class P2PConnection<
 
   get id() {
     return this._peerId;
+  }
+
+  sendRaw(data: ArrayBuffer) {
+    this._data.send(data);
   }
 
   emit<TKey extends keyof ClientToPeerEvents>(

@@ -7,6 +7,26 @@
 
 import { Option, option } from "@dbidwell94/ts-utils";
 
+/**
+ * Represents any valid JSON-serializable primitive value.
+ */
+type JsonPrimitive = string | number | boolean | null;
+
+/**
+ * Represents a JSON-serializable object.
+ */
+type JsonObject = { [key: string]: JsonValue };
+
+/**
+ * Represents a JSON-serializable array.
+ */
+type JsonArray = JsonValue[];
+
+/**
+ * Represents any value that can be successfully serialized into a JSON string.
+ */
+type JsonValue = JsonPrimitive | JsonObject | JsonArray;
+
 interface ChunkHeader {
   id: string;
   chunkIndex: number;
@@ -90,6 +110,24 @@ export class BinaryChunker {
     return option.none();
   }
 
+  private buildHeader(
+    fileId: Uint8Array,
+    chunkIndex: number,
+    isLast: boolean,
+  ): ArrayBuffer {
+    const header = new ArrayBuffer(HEADER_BYTE_SIZE);
+    const headerView = new DataView(header);
+
+    // Set the File ID (bytes 0-15)
+    new Uint8Array(header).set(fileId, 0);
+    // Set the Chunk Index (16 - 19) as a 32-bit unsigned int
+    headerView.setUint32(16, chunkIndex, false);
+    // Set Last Chunk flag (byte 20)
+    headerView.setUint8(20, isLast ? 1 : 0);
+
+    return header;
+  }
+
   private parseHeaderFromBuffer(chunk: ArrayBuffer): ChunkHeader {
     const fileId = this.bytesToId(new Uint8Array(chunk, 0, 16));
     const viewer = new DataView(chunk);
@@ -133,5 +171,17 @@ export class BinaryChunker {
     }
 
     return result.buffer;
+  }
+
+  private parseMetadata<T extends JsonValue>(
+    metadata: T,
+    fileId: Uint8Array,
+  ): ArrayBuffer {
+    const encoder = new TextEncoder();
+    const metadataBytes = encoder.encode(JSON.stringify(metadata)).buffer;
+
+    const header = this.buildHeader(fileId, 0, false);
+
+    return this.concatBuffers(header, metadataBytes);
   }
 }
