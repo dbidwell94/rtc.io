@@ -8,7 +8,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declarationMap": true,
-    "target": "ES2020",
+    "target": "ES2021",
     "module": "commonjs",
     "moduleResolution": "node",
     "removeComments": true,

@@ -2,6 +2,8 @@ import { PeerId } from "@rtcio/signaling";
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
+  data: (binaryData: ArrayBuffer) => void;
+  file: (fileBlob: Blob) => void;
 }
 
 export type VoidMethods<T> = {
@@ -30,6 +32,13 @@ export class P2PConnection<
     >;
   } = Object.create(null);
 
+  private _oneShotEvents: {
+    [K in keyof EventMap<ClientToPeerEvents>]?: Set<
+      EventMap<ClientToPeerEvents>[K]
+    >;
+  } = Object.create(null);
+
+  private _dataChunks: Map<string, ArrayBuffer[]> = new Map();
   private _connection: RTCPeerConnection;
   private _data: RTCDataChannel;
   private _peerId: PeerId;
@@ -44,12 +53,23 @@ export class P2PConnection<
     this._data = dataChannel;
 
     this._data.onmessage = ({ data }) => {
-      const messageData: InternalMessageEvent<ClientToPeerEvents> =
-        JSON.parse(data);
-
-      this._events[messageData.event]?.forEach((callback) => {
-        callback(...messageData.args);
-      });
+      switch (typeof data) {
+        case "string": {
+          this.handleStringData(data);
+          break;
+        }
+        case "object": {
+          if (data instanceof ArrayBuffer) {
+            // TODO! Handle binary data with the new BinaryChunker
+          }
+          console.error("Unknown object type received from RTCDataChannel");
+          break;
+        }
+        default: {
+          console.error("Unknown data received from RTCDataChannel");
+          break;
+        }
+      }
     };
 
     this._connection.onconnectionstatechange = () => {
@@ -63,6 +83,22 @@ export class P2PConnection<
         }
       }
     };
+  }
+
+  private handleStringData(data: string) {
+    const messageData: InternalMessageEvent<ClientToPeerEvents> =
+      JSON.parse(data);
+
+    // Call all registered persistant events
+    this._events[messageData.event]?.forEach((callback) => {
+      callback(...messageData.args);
+    });
+
+    // Call one shot events and discard afterwards
+    this._oneShotEvents[messageData.event]?.forEach((callback) => {
+      callback(...messageData.args);
+      this._oneShotEvents[messageData.event]?.delete(callback);
+    });
   }
 
   private onClosed() {
@@ -87,6 +123,25 @@ export class P2PConnection<
     } as unknown as InternalMessageEvent<ClientToPeerEvents>;
 
     this._data.send(JSON.stringify(message));
+  }
+
+  once<TKey extends keyof InternalEvents>(
+    event: TKey,
+    callback: InternalEvents[TKey],
+  ): void;
+  once<TKey extends keyof ClientToPeerEvents>(
+    event: TKey,
+    callback: ClientToPeerEvents[TKey],
+  ): void;
+  once<TKey extends keyof EventMap<ClientToPeerEvents>>(
+    event: TKey,
+    callback: EventMap<ClientToPeerEvents>[TKey],
+  ) {
+    if (this._oneShotEvents[event]) {
+      this._oneShotEvents[event].add(callback);
+    } else {
+      this._oneShotEvents[event] = new Set([callback]);
+    }
   }
 
   on<TKey extends keyof InternalEvents>(
