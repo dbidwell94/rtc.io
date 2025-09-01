@@ -1,7 +1,7 @@
 import {
+  P2PConnection,
   VoidMethods,
   type P2PConnectionEventMap,
-  type PeerId,
 } from "@rtcio/core";
 import { useContext, useEffect, useRef } from "react";
 import { type P2PContext, p2pContext } from "../provider";
@@ -13,35 +13,52 @@ export function createPeerListener<TEvents extends VoidMethods<TEvents>>() {
     event: TKey,
     callback: P2PConnectionEventMap<TEvents>[TKey],
   ) => {
-    const currentCallback = useRef(callback);
-    const subscribedPeers = useRef(new Set<PeerId>());
-
     const { peers } = useContext<P2PContext<TEvents>>(p2pContext);
 
+    const subscriptions = useRef<
+      Map<P2PConnection<TEvents>, P2PConnectionEventMap<TEvents>[TKey]>
+    >(new Map());
+
+    const callbackRef = useRef(callback);
+
     useEffect(() => {
-      // this will make sure that the cleanup function will have the current iteration of the callback
-      // so it can check if the function pointers are the same as `callback`
-      currentCallback.current = callback;
+      callbackRef.current = callback;
+    });
 
-      for (const [remotePeerId, connection] of Object.entries(peers)) {
-        if (!subscribedPeers.current.has(remotePeerId)) {
-          connection.on(event, callback);
-          subscribedPeers.current.add(remotePeerId);
-        }
-      }
+    useEffect(() => {
+      const subscribeToPeers = () => {
+        for (const [, connection] of peers) {
+          if (!subscriptions.current.has(connection)) {
+            const listener = (
+              ...args: Parameters<P2PConnectionEventMap<TEvents>[TKey]>
+            ) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              callbackRef.current(...(args as any[]));
+            };
 
-      return () => {
-        // if the callback has not changed, don't unsubscribe from the callback. If a peer has been removed,
-        // we don't have to worry about cleaning up the listeners. The peer is just gone.
-        if (currentCallback.current === callback) {
-          return;
-        }
+            connection.on(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              event as any,
+              listener,
+            );
 
-        for (const [, connection] of Object.entries(peers)) {
-          connection.off(event, callback);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            subscriptions.current.set(connection, listener as any);
+          }
         }
       };
-    }, [peers, callback]);
+
+      subscribeToPeers();
+
+      return () => {
+        for (const [, connection] of peers) {
+          if (subscriptions.current.has(connection)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            connection.off(event as any, subscriptions.current.get(connection));
+          }
+        }
+      };
+    }, [peers, event]);
   };
 
   return useSetPeerListener;

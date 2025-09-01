@@ -15,11 +15,13 @@
   "license": "MIT",
   "description": "React integration for @rtcio/core",
   "dependencies": {
-    "react": "^19.1.1",
-    "@rtcio/core": "workspace:*"
+    "@rtcio/core": "file:../core",
+    "react": "^19.1.1"
   },
   "devDependencies": {
-    "@types/react": "^19.1.12",
-    "@rtcio/signaling": "workspace:*"
+    "@rtcio/signaling": "file:../signaling",
+    "@rtcio/signal-local": "file:../signalLocalBrowser",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.12"
   }
 }
