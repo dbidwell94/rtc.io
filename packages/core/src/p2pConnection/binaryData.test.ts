@@ -16,7 +16,8 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const chunker = new BinaryChunker(BinaryChunker.HEADER_SIZE + 1);
     const data = chunker.chunkData(binaryData);
 
-    expect(data).toHaveLength(6);
+    // We expect 7 here because we also have a metadata chunk returned
+    expect(data).toHaveLength(7);
   });
 
   it("Sets headers on the chunks as expected", () => {
@@ -49,8 +50,26 @@ describe("src/p2pConnection/binaryData.ts", () => {
     [BinaryChunker.HEADER_SIZE + 2, new Uint8Array([1, 2]).buffer],
   ])("Should be an expected size of %s bytes", (expectedBufferSize, buffer) => {
     const chunker = new BinaryChunker();
-    const [data] = chunker.chunkData(buffer);
+    const [, data] = chunker.chunkData(buffer);
 
     expect(data.byteLength).toEqual(expectedBufferSize);
+  });
+
+  it("Encodes metadata correctly", () => {
+    const expectedMetadata = { testKey: "testValue" };
+    const encoded = new TextEncoder().encode(JSON.stringify(expectedMetadata));
+
+    const chunker = new BinaryChunker();
+    const [metadata] = chunker.chunkData(
+      new Uint8Array([1, 2, 3, 4, 5]).buffer,
+      { testKey: "testValue" },
+    );
+
+    expect(metadata.byteLength).toEqual(
+      BinaryChunker.HEADER_SIZE + encoded.byteLength,
+    );
+    // Ensure the underlying data excluding the header is the same as the expected
+    // encoded metadata
+    expect(metadata.slice(BinaryChunker.HEADER_SIZE)).toEqual(encoded.buffer);
   });
 });

@@ -10,22 +10,24 @@ import { Option, option } from "@dbidwell94/ts-utils";
 /**
  * Represents any valid JSON-serializable primitive value.
  */
-type JsonPrimitive = string | number | boolean | null;
+export type JsonPrimitive = string | number | boolean | null;
 
 /**
  * Represents a JSON-serializable object.
  */
-type JsonObject = { [key: string]: JsonValue };
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
 
 /**
  * Represents a JSON-serializable array.
  */
-type JsonArray = JsonValue[];
+export type JsonArray = JsonValue[];
 
 /**
  * Represents any value that can be successfully serialized into a JSON string.
  */
-type JsonValue = JsonPrimitive | JsonObject | JsonArray;
+export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 
 interface ChunkHeader {
   id: string;
@@ -52,7 +54,10 @@ export class BinaryChunker {
     return HEADER_BYTE_SIZE;
   }
 
-  chunkData(dataToChunk: ArrayBuffer): ArrayBuffer[] {
+  chunkData<T extends JsonValue = null>(
+    dataToChunk: ArrayBuffer,
+    metadata?: T,
+  ): ArrayBuffer[] {
     const chunks: ArrayBuffer[] = [];
     const dataId = crypto.randomUUID();
 
@@ -61,22 +66,15 @@ export class BinaryChunker {
     const payloadSize = this._maxChunkSize - HEADER_BYTE_SIZE;
     const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
 
-    let currentChunkId = 0;
+    // Starting at 1 here because the metadata is the first chunk always (index 0)
+    let currentChunkId = 1;
+
+    chunks.push(this.buildMetadata(metadata ?? null, dataIdBytes));
 
     for (let i = 0; i < dataToChunk.byteLength; i += payloadSize) {
       const isLastChunk = currentChunkId === totalChunks - 1;
 
-      const header = new ArrayBuffer(HEADER_BYTE_SIZE);
-      const headerView = new DataView(header);
-
-      // Set File ID (bytes 0-15)
-      new Uint8Array(header).set(dataIdBytes, 0);
-
-      // Set Chunk Index (bytes 16-19) - as a 32-bit unsigned integer
-      headerView.setUint32(16, currentChunkId, false); // false for big-endian
-
-      // Set Last Chunk Flag (byte 20)
-      headerView.setUint8(20, isLastChunk ? 1 : 0);
+      const header = this.buildHeader(dataIdBytes, currentChunkId, isLastChunk);
 
       const start = i;
       const end = Math.min(i + payloadSize, dataToChunk.byteLength);
@@ -90,7 +88,9 @@ export class BinaryChunker {
     return chunks;
   }
 
-  receiveChunk(chunk: ArrayBuffer): Option<ArrayBuffer> {
+  receiveChunk<T extends JsonValue = null>(
+    chunk: ArrayBuffer,
+  ): Option<{ data: ArrayBuffer; metadata: T }> {
     const header = this.parseHeaderFromBuffer(chunk);
 
     if (!this._chunks.has(header.id)) {
@@ -102,9 +102,12 @@ export class BinaryChunker {
     transfer[header.chunkIndex] = chunk.slice(HEADER_BYTE_SIZE);
 
     if (header.isFinal) {
+      const metadataBuffer = transfer.shift()!;
+      const metadata = this.parseMetadata<T>(metadataBuffer);
+
       const assembled = this.concatBuffers(...transfer);
       this._chunks.delete(header.id);
-      return option.some(assembled);
+      return option.some({ data: assembled, metadata });
     }
 
     return option.none();
@@ -173,7 +176,7 @@ export class BinaryChunker {
     return result.buffer;
   }
 
-  private parseMetadata<T extends JsonValue>(
+  private buildMetadata<T extends JsonValue>(
     metadata: T,
     fileId: Uint8Array,
   ): ArrayBuffer {
@@ -181,7 +184,15 @@ export class BinaryChunker {
     const metadataBytes = encoder.encode(JSON.stringify(metadata)).buffer;
 
     const header = this.buildHeader(fileId, 0, false);
-
     return this.concatBuffers(header, metadataBytes);
+  }
+
+  private parseMetadata<T extends JsonValue = null>(
+    fromBuffer: ArrayBuffer,
+  ): T {
+    const metadataData = fromBuffer.slice(HEADER_BYTE_SIZE);
+
+    const decoder = new TextDecoder("metadataDecoder");
+    return JSON.parse(decoder.decode(metadataData));
   }
 }

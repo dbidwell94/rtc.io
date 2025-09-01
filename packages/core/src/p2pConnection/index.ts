@@ -1,10 +1,17 @@
 import { PeerId } from "@rtcio/signaling";
-import { BinaryChunker } from "./binaryData";
+import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
+
+export interface FileMetadata extends JsonObject {
+  name: File["name"];
+  type: File["type"];
+  lastModified: File["lastModified"];
+  size: File["size"];
+}
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
-  data: (binaryData: ArrayBuffer) => void;
-  file: (fileBlob: Blob) => void;
+  data: <T extends JsonValue>(metadata: T, binaryData: ArrayBuffer) => void;
+  file: (metadata: FileMetadata, binaryData: Blob) => void;
 }
 
 export type VoidMethods<T> = {
@@ -93,8 +100,26 @@ export class P2PConnection<
     const optData = this._chunker.receiveChunk(data);
 
     if (optData.isSome()) {
+      const { data, metadata } = optData.value;
+
+      if (
+        metadata &&
+        "size" in metadata &&
+        "name" in metadata &&
+        "type" in metadata &&
+        "lastModified" in metadata
+      ) {
+        const fileMetadata: FileMetadata = metadata;
+        const fileBlob = new Blob([data]);
+
+        this._events["file"]?.forEach((callback) => {
+          callback(fileMetadata, fileBlob);
+        });
+        return;
+      }
+
       this._events["data"]?.forEach((callback) => {
-        callback(optData.value);
+        callback(optData.value.metadata, optData.value.data);
       });
     }
   }
@@ -125,8 +150,23 @@ export class P2PConnection<
     return this._peerId;
   }
 
-  sendRaw(data: ArrayBuffer) {
-    this._data.send(data);
+  sendRaw<T extends JsonValue>(data: ArrayBuffer, metadata?: T) {
+    const chunks = this._chunker.chunkData(data, metadata);
+
+    for (const chunk in chunks) {
+      this._data.send(chunk);
+    }
+  }
+
+  async sendFile(file: File) {
+    const fileMetadata: FileMetadata = {
+      name: file.name,
+      size: file.size,
+      lastModified: file.lastModified,
+      type: file.type,
+    };
+
+    this.sendRaw(await file.arrayBuffer(), fileMetadata);
   }
 
   emit<TKey extends keyof ClientToPeerEvents>(
