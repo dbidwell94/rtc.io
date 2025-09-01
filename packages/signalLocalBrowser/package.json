@@ -1,0 +1,28 @@
+{
+  "name": "@rtcio/signal-local",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "scripts": {},
+  "files": [
+    "dist",
+    "../../LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "keywords": [
+    "rtcio",
+    "signal",
+    "signal server",
+    "local"
+  ],
+  "author": "Devin Bidwell <dbidwell94@biddydev.com>",
+  "license": "MIT",
+  "description": "A local only rtcio signal 'server'.",
+  "dependencies": {
+    "broadcast-channel": "^7.1.0"
+  },
+  "devDependencies": {
+    "wait-for-expect": "^4.0.0"
+  }
+}

@@ -1,6 +1,6 @@
-# rtc.io
+# rtcio
 
-Inspired by socket.io, rct.io is an easier to use way of dealing with WebRTC.
+Inspired by socket.io, rtcio is an easier to use way of dealing with WebRTC.
 It wraps the logic of creating RTCPeerConnections in easy-to-use callback
 chaining.
 
@@ -8,46 +8,105 @@ chaining.
 
 - Built in TypeScript and is fully typed
 - Works with your custom signal server via an implemented interface
+  - Also has pre-built client-side signal server implementations
+    - @rtcio/socket-io-client
+    - @rtcio/signal-local
+  - Default server side signaler implementation available at:
+    - @rtcio/socket-io-server
 - Generic typed parameters for custom events listeners and emitters
-- Only one production dependency
+- Optional pre-built wrapper for React via `@rtcio/react`
+- Create your own signaler by extending `ClientSignaler` in `@rtcio/signaling`
 
 ## Roadmap
 
-- Finish implementing RTCDataChannel and RTCPeerConnection abstraction
-
-- Abstract video and audio streams
+- Handle audio and visual streams
+- Custom signaler with raw websockets
+- Custom signaler with raw Server Sent Events (SSE)
 
 ## Usage/Examples
 
 ```typescript
-import { rtc } from 'rtc.io'
-import signalServer from '../yourSignalServerApi'
-import { iceConfig } from '../config/yourIceConfig';
+import { RTC } from "@rtcio/core";
+import { SocketIoSignaler } from "@rtcio/socket-io-client";
 
-interface IMyCustomEvent {
-    message: (message: string) => void;
+const ROOM_NAME = "signalerRoom1";
+
+interface MyCustomEvents {
+  message: (messageText: string) => void;
 }
 
-const p2p = rtc<IMyCustomEvent>(signalServer, iceConfig);
+// There is a default server implementation for socket.io at
+// `@rtcio/socket-io-server`
+const io = new RTC<MyCustomEvents>(new SocketIoSignaler(socketArgs), ROOM_NAME);
 
-p2p.on('connection' (peer) => {
+const idResult = await io.connectToRoom();
+if (idResult.isError()) {
+  // Unable to connect to the signal server
+  console.error(idResult.error);
+  return;
+}
 
-    // Fully typed event injects the parameter type into the callback
-    peer.on('message', (msg) => {
-        console.log(msg);
-    })
+const myLocalId = idResult.value;
 
-    // Some already built in events ready to use
-    peer.on('close', () => {
-        console.log(`Peer ${peer.id} closed the connection`);
-    })
+// Here we are 100% sure we have a valid connection AND a data channel
+// This event is fired when a new remote peer has a direct connection to you.
+// You can subscribe, unsubscribe, and emit events directly to the peer
+io.on("connected", (newPeer) => {
+  newPeer.emit("message", "Hello, and welcome to rtcio!");
 
-    // You can overload your callbacks to have more than 1 fire
-    // when an event is received.
-    peer.on('message' (msg) => {
-        console.log("2nd callback!");
-    })
+  newPeer.on("message", (messageText) => {
+    console.log(`New message from ${newPeer.id}: ${messageText}`);
+  });
 });
 
-p2p.connect('roomName');
+const roomPeers = io.getRoomPeers();
+
+for (const peerId of roomPeers) {
+  // awaiting here doesn't actually wait for the connection.
+  // it's purely for the RTCPeerConnection to acquire all the
+  // data it needs to send to the signal server.
+  // You do _not_ have to await this for the connection to process.
+  await io.connectToPeer(peerId);
+}
 ```
+
+## Testing
+
+rtcio provides a local signaler as well which is useful for testing.
+The package is `@rtcio/signal-local`. Just remember that because
+signalers should happen on each client, and here you are emulating 2
+clients, you need 2 signal servers.
+
+```typescript
+import { RTC } from "@rtcio/core";
+import { LocalSignalServer } from "@rtcio/signal-local";
+
+const ROOM_NAME = "TEST_ROOM";
+
+const client1 = new RTC(new LocalSignalServer(), ROOM_NAME);
+const client2 = new RTC(new LocalSignalServer(), ROOM_NAME);
+
+// This should not be done in production, but the LocalSignalServer will
+// not fail to connect as it uses BroadcastChannel behind the scenes.
+const client2Id = (await client2.connectToRoom()).unwrap();
+const client1Id = (await client1.connectToRoom()).unwrap();
+
+client2.on("connectionRequest", async (req) => {
+  if (req.remoteId === client1Id) {
+    await req.accept();
+  } else {
+    req.reject();
+  }
+});
+
+client2.on("connected", (peer1) => {
+  console.log(`Peer1 connected with id ${peer1.id}`);
+});
+
+await client1.connectToPeer(client2Id);
+```
+
+## API Documentation
+
+Api documentation is coming in the near future, implemented via `typedoc`,
+and will be available on GitHub Pages once the integration is complete.
