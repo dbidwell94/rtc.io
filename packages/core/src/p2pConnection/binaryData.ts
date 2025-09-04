@@ -35,30 +35,52 @@ interface ChunkHeader {
   isFinal: boolean;
 }
 
+interface ChunkerOptions {
+  maxChunkSize?: number;
+  dataTimeout?: number;
+  onDataTimeout: (dataId: string) => void;
+}
+
 const HEADER_BYTE_SIZE = 21;
 
 export class BinaryChunker {
-  private _chunks: Map<string, ArrayBuffer[]> = new Map();
-  private _maxChunkSize: number;
+  private _chunks: Map<
+    string,
+    {
+      buffers: ArrayBuffer[];
+      hasFinal: boolean;
+      totalExpectedSize: number;
+      cleanupTimeout: ReturnType<typeof window.setTimeout>;
+    }
+  > = new Map();
 
-  constructor(maxChunkSize = 1024) {
+  private _maxChunkSize: number;
+  private _dataTimeoutMs: number;
+  private _onDataTimeout: (dataId: string) => void;
+
+  constructor({
+    maxChunkSize = 1024,
+    dataTimeout = 5000,
+    onDataTimeout,
+  }: ChunkerOptions) {
     if (maxChunkSize <= HEADER_BYTE_SIZE) {
       throw new Error(
         "Unable to create a BinaryChunker with a max packet size less than the header size",
       );
     }
     this._maxChunkSize = maxChunkSize;
+    this._dataTimeoutMs = dataTimeout;
+    this._onDataTimeout = onDataTimeout;
   }
 
   static get HEADER_SIZE() {
     return HEADER_BYTE_SIZE;
   }
 
-  chunkData<T extends JsonValue = null>(
+  *chunkData<T extends JsonValue = null>(
     dataToChunk: ArrayBuffer,
     metadata?: T,
-  ): ArrayBuffer[] {
-    const chunks: ArrayBuffer[] = [];
+  ): Generator<ArrayBuffer> {
     const dataId = crypto.randomUUID();
 
     const dataIdBytes = this.uuidToBytes(dataId);
@@ -68,22 +90,22 @@ export class BinaryChunker {
     // adding 1 here because of the metadata chunk
     const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
 
-    chunks.push(this.buildMetadata(metadata ?? null, dataIdBytes));
+    let chunkId = 1;
+
+    yield this.buildMetadata(metadata ?? null, dataIdBytes);
 
     for (let i = 0; i < dataToChunk.byteLength; i += payloadSize) {
-      const currentChunkId = chunks.length;
-      const isLastChunk = currentChunkId === totalChunks;
+      const isLastChunk = chunkId === totalChunks;
 
-      const header = this.buildHeader(dataIdBytes, currentChunkId, isLastChunk);
+      const header = this.buildHeader(dataIdBytes, chunkId, isLastChunk);
 
       const start = i;
       const end = Math.min(i + payloadSize, dataToChunk.byteLength);
       const chunkPayload = dataToChunk.slice(start, end);
 
-      chunks.push(this.concatBuffers(header, chunkPayload));
+      chunkId += 1;
+      yield this.concatBuffers(header, chunkPayload);
     }
-
-    return chunks;
   }
 
   receiveChunk<T extends JsonValue = null>(
@@ -91,20 +113,54 @@ export class BinaryChunker {
   ): Option<{ data: ArrayBuffer; metadata: Option<T> }> {
     const header = this.parseHeaderFromBuffer(chunk);
 
+    const createCleanupTimeout = (
+      currentTimeout?: ReturnType<typeof window.setTimeout>,
+    ) => {
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+      }
+      return setTimeout(() => {
+        this._chunks.delete(header.id);
+        this._onDataTimeout(header.id);
+      }, this._dataTimeoutMs);
+    };
+
     if (!this._chunks.has(header.id)) {
-      this._chunks.set(header.id, []);
+      this._chunks.set(header.id, {
+        buffers: [],
+        hasFinal: false,
+        totalExpectedSize: 0,
+        cleanupTimeout: createCleanupTimeout(),
+      });
+    } else {
+      // new data received, set a new data timeout.
+      this._chunks.get(header.id)!.cleanupTimeout = createCleanupTimeout(
+        this._chunks.get(header.id)!.cleanupTimeout,
+      );
     }
 
-    const transfer = this._chunks.get(header.id)!;
+    const { buffers: transfer } = this._chunks.get(header.id)!;
 
     transfer[header.chunkIndex] = chunk.slice(HEADER_BYTE_SIZE);
 
     if (header.isFinal) {
+      this._chunks.get(header.id)!.hasFinal = true;
+      this._chunks.get(header.id)!.totalExpectedSize = header.chunkIndex + 1;
+    }
+
+    if (
+      this._chunks.get(header.id)!.hasFinal &&
+      Object.keys(transfer).length ===
+        this._chunks.get(header.id)!.totalExpectedSize
+    ) {
       const metadataBuffer = transfer.shift()!;
       const metadata = this.parseMetadata<T>(metadataBuffer);
 
       const assembled = this.concatBuffers(...transfer);
+
+      clearTimeout(this._chunks.get(header.id)!.cleanupTimeout);
       this._chunks.delete(header.id);
+
       return option.some({ data: assembled, metadata });
     }
 

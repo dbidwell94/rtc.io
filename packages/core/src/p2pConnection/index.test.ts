@@ -47,7 +47,7 @@ describe("src/p2pConnection/index.ts", () => {
       peer2.on("test", (data) => res(data)),
     );
 
-    peer1.emit("test", eventItem);
+    await peer1.emit("test", eventItem);
 
     expect(await receivedEvent).toEqual(eventItem);
 
@@ -61,7 +61,7 @@ describe("src/p2pConnection/index.ts", () => {
     const [peer1, peer2] = await createPeers<Events>();
 
     peer1.on("test", spy);
-    peer2.emit("test", testData);
+    await peer2.emit("test", testData);
 
     await waitFor(() => {
       expect(spy).toHaveBeenCalledTimes(1);
@@ -70,7 +70,7 @@ describe("src/p2pConnection/index.ts", () => {
 
     peer1.off("test", spy);
     spy.mockClear();
-    peer2.emit("test", testData);
+    await peer2.emit("test", testData);
 
     expect(spy).not.toHaveBeenCalled();
 
@@ -85,7 +85,7 @@ describe("src/p2pConnection/index.ts", () => {
     peer1.once("test", spy);
 
     for (let i = 0; i < 10; i++) {
-      peer2.emit("test", testData);
+      await peer2.emit("test", testData);
     }
 
     await waitFor(() => {

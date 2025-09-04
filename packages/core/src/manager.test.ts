@@ -65,8 +65,8 @@ describe("src/manager.ts", () => {
     });
 
     const p2p2 = new RTC<TestInterface>(signal2, ROOM_NAME);
-    p2p2.on("connected", (p2p) => {
-      p2p.emit("message", testMessage);
+    p2p2.on("connected", async (p2p) => {
+      await p2p.emit("message", testMessage);
     });
     p2p2.on("connectionRequest", async (offer) => {
       if (offer.remoteId === peer1Id) {
