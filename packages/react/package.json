@@ -16,10 +16,10 @@
   "description": "React integration for @rtcio/core",
   "dependencies": {
     "react": "^19.1.1",
-    "@rtcio/core": "workspace:*"
+    "@rtcio/core": "file:../core"
   },
   "devDependencies": {
     "@types/react": "^19.1.12",
-    "@rtcio/signaling": "workspace:*"
+    "@rtcio/signaling": "file:../signaling"
   }
 }

@@ -55,6 +55,10 @@ export interface InternalEvents<
    * inspect the `offer.remoteId` to view the uuid-v4 of the remote peer.
    */
   connectionRequest: (offer: RemoteOffer) => void;
+  /**
+   * Called if there is an error in the RTC or Signaling process
+   */
+  error: (error: Error) => void;
 }
 
 interface PeerState {

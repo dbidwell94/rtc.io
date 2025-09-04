@@ -34,10 +34,10 @@
     "typedoc": "^0.28.11",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",
-    "wait-for-expect": "^4.0.0"
+    "wait-for-expect": "^4.0.0",
+    "@rtcio/signaling": "file:../signaling"
   },
   "dependencies": {
-    "@dbidwell94/ts-utils": "^1.0.0",
-    "@rtcio/signaling": "^0.1.0"
+    "@dbidwell94/ts-utils": "^1.0.0"
   }
 }

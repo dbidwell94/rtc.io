@@ -116,6 +116,7 @@ export class P2PConnection<
 
     this._oneShotEvents["error"]?.forEach((callback) => {
       callback(error);
+      this._oneShotEvents["error"]?.delete(callback);
     });
   }
 
@@ -138,6 +139,7 @@ export class P2PConnection<
 
         this._oneShotEvents["file"]?.forEach((callback) => {
           callback(metadata as Option<FileMetadata>, fileBlob);
+          this._oneShotEvents["file"]?.delete(callback);
         });
         return;
       }
@@ -148,6 +150,7 @@ export class P2PConnection<
 
       this._oneShotEvents["data"]?.forEach((callback) => {
         callback(optData.value.metadata, optData.value.data);
+        this._oneShotEvents["data"]?.delete(callback);
       });
     }
   }
