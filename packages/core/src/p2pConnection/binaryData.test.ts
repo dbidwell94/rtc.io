@@ -15,7 +15,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
   it("Returns the correct amount of chunks", () => {
     const binaryData = new Uint8Array([1, 2, 3, 4, 5, 6]).buffer;
     const chunker = new BinaryChunker(BinaryChunker.HEADER_SIZE + 1);
-    const data = chunker.chunkData(binaryData);
+    const data = Array.from(chunker.chunkData(binaryData));
 
     // We expect 7 here because we also have a metadata chunk returned
     expect(data).toHaveLength(7);
@@ -81,7 +81,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const chunker = new BinaryChunker(BinaryChunker.HEADER_SIZE + 1);
 
-    const chunks = chunker.chunkData(data.buffer);
+    const chunks = Array.from(chunker.chunkData(data.buffer));
     // 5 chunks and 1 metadata
     expect(chunks).toHaveLength(6);
 
