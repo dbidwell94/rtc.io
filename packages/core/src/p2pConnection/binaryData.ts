@@ -74,12 +74,6 @@ export class BinaryChunker {
       const currentChunkId = chunks.length;
       const isLastChunk = currentChunkId === totalChunks;
 
-      console.log({
-        totalChunks,
-        currentChunkId,
-        isLastChunk,
-      });
-
       const header = this.buildHeader(dataIdBytes, currentChunkId, isLastChunk);
 
       const start = i;

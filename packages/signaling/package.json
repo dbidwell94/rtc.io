@@ -14,7 +14,7 @@
     "dist"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",

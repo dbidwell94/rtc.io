@@ -2,9 +2,9 @@
   "name": "@rtcio/react",
   "version": "0.1.0",
   "scripts": {},
-  "exports": [
-    "./src/index.ts"
-  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "keywords": [
     "react",
     "webrtc",

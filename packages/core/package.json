@@ -9,7 +9,7 @@
     "README.md"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "keywords": [
     "WebRTC",
@@ -17,7 +17,7 @@
     "P2P",
     "rtcio"
   ],
-  "main": "src/index.ts",
+  "main": "dist/index.ts",
   "scripts": {},
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
@@ -37,7 +37,5 @@
     "wait-for-expect": "^4.0.0",
     "@rtcio/signaling": "file:../signaling"
   },
-  "dependencies": {
-    "@dbidwell94/ts-utils": "^1.0.0"
-  }
+  "dependencies": {}
 }
