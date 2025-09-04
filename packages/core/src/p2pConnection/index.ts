@@ -1,5 +1,6 @@
 import { PeerId } from "@rtcio/signaling";
 import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
+import { Option } from "@dbidwell94/ts-utils";
 
 export interface FileMetadata extends JsonObject {
   name: File["name"];
@@ -11,11 +12,15 @@ export interface FileMetadata extends JsonObject {
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
-  data: <T extends JsonValue>(metadata: T, binaryData: ArrayBuffer) => void;
+  data: <T extends JsonValue>(
+    metadata: Option<T>,
+    binaryData: ArrayBuffer,
+  ) => void;
   file: (
-    metadata: Omit<FileMetadata, "____internal_____isFile">,
+    metadata: Option<Omit<FileMetadata, "_internalIsFile">>,
     binaryData: Blob,
   ) => void;
+  error: (error: Error) => void;
 }
 
 export type VoidMethods<T> = {
@@ -73,15 +78,20 @@ export class P2PConnection<
           break;
         }
         case "object": {
-          if (data instanceof ArrayBuffer) {
-            this.handleBinaryData(data);
+          // typeof ArrayBuffer not working here for some reason
+          if (data.constructor.name === "ArrayBuffer") {
+            this.handleBinaryData(data as ArrayBuffer);
             break;
           }
-          console.error("Unknown object type received from RTCDataChannel");
+          this.emitError(
+            new Error("Unknown object type received from RTCDataChannel"),
+          );
           break;
         }
         default: {
-          console.error("Unknown data received from RTCDataChannel");
+          this.emitError(
+            new Error("Unknown data received from RTCDataChannel"),
+          );
           break;
         }
       }
@@ -100,6 +110,17 @@ export class P2PConnection<
     };
   }
 
+  private emitError(error: Error) {
+    this._events["error"]?.forEach((callback) => {
+      callback(error);
+    });
+
+    this._oneShotEvents["error"]?.forEach((callback) => {
+      callback(error);
+      this._oneShotEvents["error"]?.delete(callback);
+    });
+  }
+
   private handleBinaryData(data: ArrayBuffer) {
     const optData = this._chunker.receiveChunk<FileMetadata | JsonValue>(data);
 
@@ -114,13 +135,23 @@ export class P2PConnection<
         const fileBlob = new Blob([data]);
 
         this._events["file"]?.forEach((callback) => {
-          callback(metadata, fileBlob);
+          callback(metadata as Option<FileMetadata>, fileBlob);
+        });
+
+        this._oneShotEvents["file"]?.forEach((callback) => {
+          callback(metadata as Option<FileMetadata>, fileBlob);
+          this._oneShotEvents["file"]?.delete(callback);
         });
         return;
       }
 
       this._events["data"]?.forEach((callback) => {
         callback(optData.value.metadata, optData.value.data);
+      });
+
+      this._oneShotEvents["data"]?.forEach((callback) => {
+        callback(optData.value.metadata, optData.value.data);
+        this._oneShotEvents["data"]?.delete(callback);
       });
     }
   }
@@ -154,7 +185,7 @@ export class P2PConnection<
   sendRaw<T extends JsonValue>(data: ArrayBuffer, metadata?: T) {
     const chunks = this._chunker.chunkData(data, metadata);
 
-    for (const chunk in chunks) {
+    for (const chunk of chunks) {
       this._data.send(chunk);
     }
   }

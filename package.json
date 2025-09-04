@@ -27,5 +27,8 @@
     "typedoc": "^0.28.11",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0"
+  },
+  "dependencies": {
+    "@dbidwell94/ts-utils": "^1.1.0"
   }
 }
