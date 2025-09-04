@@ -188,12 +188,10 @@ export class BinaryChunker {
   private parseMetadata<T extends JsonValue = null>(
     fromBuffer: ArrayBuffer,
   ): Option<T> {
-    const metadataData = fromBuffer.slice(HEADER_BYTE_SIZE);
-
     const decoder = new TextDecoder("utf8");
-    const decoded = decoder.decode(metadataData);
+    const decoded = decoder.decode(fromBuffer);
     try {
-      return option.some(JSON.parse(decoded));
+      return option.unknown(JSON.parse(decoded));
     } catch (_) {
       return option.none();
     }

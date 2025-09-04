@@ -78,8 +78,9 @@ export class P2PConnection<
           break;
         }
         case "object": {
-          if (data instanceof ArrayBuffer) {
-            this.handleBinaryData(data);
+          // typeof ArrayBuffer not working here for some reason
+          if (data.constructor.name === "ArrayBuffer") {
+            this.handleBinaryData(data as ArrayBuffer);
             break;
           }
           this.emitError(
@@ -184,7 +185,7 @@ export class P2PConnection<
   sendRaw<T extends JsonValue>(data: ArrayBuffer, metadata?: T) {
     const chunks = this._chunker.chunkData(data, metadata);
 
-    for (const chunk in chunks) {
+    for (const chunk of chunks) {
       this._data.send(chunk);
     }
   }

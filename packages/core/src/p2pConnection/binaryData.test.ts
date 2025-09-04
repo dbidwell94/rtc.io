@@ -108,9 +108,11 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const data = new Uint8Array([1, 2, 3, 4, 5]);
     const chunker = new BinaryChunker();
 
-    const chunks = chunker.chunkData<Metadata>(data.buffer, {
+    const metadata: Metadata = {
       item1: "Hello, World!",
-    });
+    };
+
+    const chunks = chunker.chunkData<Metadata>(data.buffer, metadata);
 
     let assembled: ReturnType<typeof chunker.receiveChunk<Metadata>> =
       option.none();
@@ -123,5 +125,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     }
 
     expect(assembled.isSome()).toBeTruthy();
+    const { metadata: recvMetadata } = assembled.unwrap();
+    expect(recvMetadata.unwrap()).toEqual(metadata);
   });
 });
