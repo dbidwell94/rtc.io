@@ -20,6 +20,7 @@ export interface InternalEvents {
     metadata: Option<Omit<FileMetadata, "_internalIsFile">>,
     binaryData: Blob,
   ) => void;
+  error: (error: Error) => void;
 }
 
 export type VoidMethods<T> = {
@@ -81,11 +82,15 @@ export class P2PConnection<
             this.handleBinaryData(data);
             break;
           }
-          console.error("Unknown object type received from RTCDataChannel");
+          this.emitError(
+            new Error("Unknown object type received from RTCDataChannel"),
+          );
           break;
         }
         default: {
-          console.error("Unknown data received from RTCDataChannel");
+          this.emitError(
+            new Error("Unknown data received from RTCDataChannel"),
+          );
           break;
         }
       }
@@ -104,6 +109,16 @@ export class P2PConnection<
     };
   }
 
+  private emitError(error: Error) {
+    this._events["error"]?.forEach((callback) => {
+      callback(error);
+    });
+
+    this._oneShotEvents["error"]?.forEach((callback) => {
+      callback(error);
+    });
+  }
+
   private handleBinaryData(data: ArrayBuffer) {
     const optData = this._chunker.receiveChunk<FileMetadata | JsonValue>(data);
 
@@ -120,10 +135,18 @@ export class P2PConnection<
         this._events["file"]?.forEach((callback) => {
           callback(metadata as Option<FileMetadata>, fileBlob);
         });
+
+        this._oneShotEvents["file"]?.forEach((callback) => {
+          callback(metadata as Option<FileMetadata>, fileBlob);
+        });
         return;
       }
 
       this._events["data"]?.forEach((callback) => {
+        callback(optData.value.metadata, optData.value.data);
+      });
+
+      this._oneShotEvents["data"]?.forEach((callback) => {
         callback(optData.value.metadata, optData.value.data);
       });
     }
