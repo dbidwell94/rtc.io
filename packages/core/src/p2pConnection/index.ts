@@ -1,5 +1,6 @@
 import { PeerId } from "@rtcio/signaling";
 import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
+import { Option } from "@dbidwell94/ts-utils";
 
 export interface FileMetadata extends JsonObject {
   name: File["name"];
@@ -11,9 +12,12 @@ export interface FileMetadata extends JsonObject {
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => void;
-  data: <T extends JsonValue>(metadata: T, binaryData: ArrayBuffer) => void;
+  data: <T extends JsonValue>(
+    metadata: Option<T>,
+    binaryData: ArrayBuffer,
+  ) => void;
   file: (
-    metadata: Omit<FileMetadata, "____internal_____isFile">,
+    metadata: Option<Omit<FileMetadata, "_internalIsFile">>,
     binaryData: Blob,
   ) => void;
 }
@@ -114,7 +118,7 @@ export class P2PConnection<
         const fileBlob = new Blob([data]);
 
         this._events["file"]?.forEach((callback) => {
-          callback(metadata, fileBlob);
+          callback(metadata as Option<FileMetadata>, fileBlob);
         });
         return;
       }

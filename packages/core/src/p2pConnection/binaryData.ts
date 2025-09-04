@@ -64,23 +64,27 @@ export class BinaryChunker {
     const dataIdBytes = this.uuidToBytes(dataId);
 
     const payloadSize = this._maxChunkSize - HEADER_BYTE_SIZE;
-    const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
 
-    // Starting at 1 here because the metadata is the first chunk always (index 0)
-    let currentChunkId = 1;
+    // adding 1 here because of the metadata chunk
+    const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
 
     chunks.push(this.buildMetadata(metadata ?? null, dataIdBytes));
 
     for (let i = 0; i < dataToChunk.byteLength; i += payloadSize) {
-      const isLastChunk = currentChunkId === totalChunks - 1;
+      const currentChunkId = chunks.length;
+      const isLastChunk = currentChunkId === totalChunks;
+
+      console.log({
+        totalChunks,
+        currentChunkId,
+        isLastChunk,
+      });
 
       const header = this.buildHeader(dataIdBytes, currentChunkId, isLastChunk);
 
       const start = i;
       const end = Math.min(i + payloadSize, dataToChunk.byteLength);
       const chunkPayload = dataToChunk.slice(start, end);
-
-      currentChunkId++;
 
       chunks.push(this.concatBuffers(header, chunkPayload));
     }
@@ -90,7 +94,7 @@ export class BinaryChunker {
 
   receiveChunk<T extends JsonValue = null>(
     chunk: ArrayBuffer,
-  ): Option<{ data: ArrayBuffer; metadata: T }> {
+  ): Option<{ data: ArrayBuffer; metadata: Option<T> }> {
     const header = this.parseHeaderFromBuffer(chunk);
 
     if (!this._chunks.has(header.id)) {
@@ -189,10 +193,15 @@ export class BinaryChunker {
 
   private parseMetadata<T extends JsonValue = null>(
     fromBuffer: ArrayBuffer,
-  ): T {
+  ): Option<T> {
     const metadataData = fromBuffer.slice(HEADER_BYTE_SIZE);
 
-    const decoder = new TextDecoder("metadataDecoder");
-    return JSON.parse(decoder.decode(metadataData));
+    const decoder = new TextDecoder("utf8");
+    const decoded = decoder.decode(metadataData);
+    try {
+      return option.some(JSON.parse(decoded));
+    } catch (_) {
+      return option.none();
+    }
   }
 }
