@@ -2,6 +2,9 @@ import { option } from "@dbidwell94/ts-utils";
 import { BinaryChunker, JsonObject } from "./binaryData";
 
 describe("src/p2pConnection/binaryData.ts", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
   it("Throws an error if you try to create an instance with too low a chunk size", () => {
     expect(
       () => new BinaryChunker({ onDataTimeout: jest.fn(), maxChunkSize: 1 }),
@@ -185,5 +188,42 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     expect(data).toEqual(expectedData.buffer);
     expect(recvMetadata.unwrap()).toEqual(metadata);
+  });
+
+  it("Removes data from memory if packets are not received within the dataTimeoutMs", async () => {
+    jest.useFakeTimers();
+    const dataTimeoutCallback = jest.fn();
+    const timeout = 100;
+
+    const data = new Uint8Array([1, 2, 3, 4, 5]);
+
+    const chunker = new BinaryChunker({
+      onDataTimeout: dataTimeoutCallback,
+      dataTimeout: timeout,
+      maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
+    });
+
+    const [chunk1, chunk2, chunk3] = Array.from(chunker.chunkData(data.buffer));
+
+    const id = chunker["parseHeaderFromBuffer"](chunk1).id;
+
+    expect(chunker.receiveChunk(chunk1).isNone()).toBeTruthy();
+    jest.advanceTimersByTime(timeout - 1);
+    expect(dataTimeoutCallback).not.toHaveBeenCalled();
+    expect(chunker["_chunks"].size).toEqual(1);
+
+    expect(chunker.receiveChunk(chunk2).isNone()).toBeTruthy();
+    // A new chunk was received. This should reset the timeout.
+    jest.advanceTimersByTime(timeout - 1);
+    expect(dataTimeoutCallback).not.toHaveBeenCalled();
+
+    expect(chunker.receiveChunk(chunk3).isNone()).toBeTruthy();
+    jest.advanceTimersByTime(timeout);
+    expect(dataTimeoutCallback).toHaveBeenCalledTimes(1);
+    expect(dataTimeoutCallback).toHaveBeenCalledWith(id);
+
+    // Data has timed out. We have removed the data from memory and notified the user
+    // of the failed transfer.
+    expect(chunker["_chunks"].size).toEqual(0);
   });
 });

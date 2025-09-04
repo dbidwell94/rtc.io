@@ -122,7 +122,7 @@ export class BinaryChunker {
       return setTimeout(() => {
         this._chunks.delete(header.id);
         this._onDataTimeout(header.id);
-      }, 5000);
+      }, this._dataTimeoutMs);
     };
 
     if (!this._chunks.has(header.id)) {
