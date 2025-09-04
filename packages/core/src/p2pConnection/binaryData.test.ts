@@ -1,5 +1,5 @@
-import { option } from "@dbidwell94/ts-utils";
-import { BinaryChunker, JsonObject } from "./binaryData";
+import { option, Option } from "@dbidwell94/ts-utils";
+import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
 
 describe("src/p2pConnection/binaryData.ts", () => {
   afterEach(() => {
@@ -225,5 +225,40 @@ describe("src/p2pConnection/binaryData.ts", () => {
     // Data has timed out. We have removed the data from memory and notified the user
     // of the failed transfer.
     expect(chunker["_chunks"].size).toEqual(0);
+  });
+
+  it("Can handle packets from different ids without 'crossing streams'", async () => {
+    const expected1 = new Uint8Array([6, 7, 8, 9, 0]);
+    const expected2 = new Uint8Array([1, 2, 3, 4, 5]);
+
+    const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+
+    const chunks1 = Array.from(chunker.chunkData(expected1.buffer));
+    const chunks2 = Array.from(chunker.chunkData(expected2.buffer));
+
+    const chunks: ArrayBuffer[] = [];
+    for (let i = 0; i < chunks1.length; i++) {
+      chunks.push(chunks1[i]);
+      chunks.push(chunks2[i]);
+    }
+
+    expect(chunks).toHaveLength(chunks1.length + chunks2.length);
+
+    const assembled: Array<{ data: ArrayBuffer; metadata: Option<JsonValue> }> =
+      [];
+
+    for (const chunk of chunks) {
+      const res = chunker.receiveChunk(chunk);
+
+      if (res.isSome()) {
+        assembled.push(res.value);
+      }
+    }
+
+    expect(assembled).toHaveLength(2);
+
+    expect([assembled[0].data, assembled[1].data]).toEqual(
+      expect.arrayContaining([expected1.buffer, expected2.buffer]),
+    );
   });
 });
