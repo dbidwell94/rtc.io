@@ -5,7 +5,7 @@ import {
   JsonObject,
   JsonValue,
 } from "./binaryData";
-import { Option } from "@dbidwell94/ts-utils";
+import { Option, result, Result } from "@dbidwell94/ts-utils";
 
 export interface FileMetadata extends JsonObject {
   name: File["name"];
@@ -63,6 +63,7 @@ export interface P2POptions
   connection: RTCPeerConnection;
   genericDataChannel: RTCDataChannel;
   binaryDataChannel: RTCDataChannel;
+  onClose: () => MaybePromise<void>;
 }
 
 function metadataIsForFile(metadata: unknown): metadata is FileMetadata {
@@ -92,11 +93,15 @@ export class P2PConnection<
   private _binaryData: RTCDataChannel;
   private _peerId: PeerId;
 
+  private _onCloseManagerCallback: () => MaybePromise<void>;
+  private _calledCloseHandlers: boolean = false;
+
   constructor({
     connection,
     genericDataChannel,
     binaryDataChannel,
     peerId,
+    onClose,
     dataTimeout = 5_000, // 5 seconds
     maxChunkSize = 1024, // 1KB
   }: P2POptions) {
@@ -114,6 +119,8 @@ export class P2PConnection<
 
     this._data.bufferedAmountLowThreshold = 1024 * 64; // 64 KB
     this._binaryData.bufferedAmountLowThreshold = 1024 * 64; // 64 KB
+
+    this._onCloseManagerCallback = onClose;
 
     this._binaryData.onmessage = async ({ data }) => {
       if (typeof data === "object" && data.constructor.name === "ArrayBuffer") {
@@ -136,10 +143,12 @@ export class P2PConnection<
       await this.handleStringData(data);
     };
 
-    this._connection.onconnectionstatechange = async () => {
-      switch (this._connection.connectionState) {
+    this._connection.onconnectionstatechange = async (evt) => {
+      const connection = evt.target as RTCPeerConnection;
+      switch (connection.connectionState) {
         case "closed": {
-          await this.onClosed();
+          console.log("Calling close handler from the P2P Connection");
+          await this.close();
           break;
         }
         default: {
@@ -147,6 +156,15 @@ export class P2PConnection<
         }
       }
     };
+
+    this.setupListeners();
+  }
+
+  private setupListeners() {
+    this.on("connectionClosed", async () => {
+      console.log("Calling close handler from connectionClosed event");
+      await this.close();
+    });
   }
 
   private async onDataTimedOut(dataId: string) {
@@ -254,69 +272,126 @@ export class P2PConnection<
   }
 
   private async handleStringData(data: string) {
-    const messageData: InternalMessageEvent<ClientToPeerEvents> =
-      JSON.parse(data);
-
-    await this.callHandlers(messageData.event, ...messageData.args);
+    try {
+      const messageData: InternalMessageEvent<ClientToPeerEvents> =
+        JSON.parse(data);
+      await this.callHandlers(messageData.event, ...messageData.args);
+    } catch (err) {
+      await this.callHandlers("error", err as Error);
+    }
   }
 
   private async onClosed() {
+    if (this._calledCloseHandlers) {
+      return;
+    }
     await this.callHandlers("connectionClosed", this._peerId);
+    await this._onCloseManagerCallback();
+    this._calledCloseHandlers = true;
   }
 
   get id() {
     return this._peerId;
   }
 
-  private async waitForBinaryBuffer() {
+  private async waitForBinaryBuffer(): Promise<Result<void>> {
     if (
       this._binaryData.bufferedAmount >
       this._binaryData.bufferedAmountLowThreshold
     ) {
-      await new Promise<void>((res) => {
-        const onBufferAmountLow = () => {
-          this._binaryData.removeEventListener(
+      const res = await result.fromPromise(
+        new Promise<void>((res, rej) => {
+          const waitTimeout = setTimeout(() => {
+            this._binaryData.removeEventListener(
+              "bufferedamountlow",
+              onBufferAmountLow,
+            );
+            rej(
+              "Timeout of 500ms exceeded waiting for space in the binary data buffer",
+            );
+          }, 500);
+
+          const onBufferAmountLow = () => {
+            this._binaryData.removeEventListener(
+              "bufferedamountlow",
+              onBufferAmountLow,
+            );
+            clearTimeout(waitTimeout);
+            res();
+          };
+
+          this._binaryData.addEventListener(
             "bufferedamountlow",
             onBufferAmountLow,
           );
-          res();
-        };
+        }),
+      );
 
-        this._binaryData.addEventListener(
-          "bufferedamountlow",
-          onBufferAmountLow,
-        );
-      });
+      if (res.isError()) {
+        return result.err(res.error);
+      }
     }
+
+    return result.ok(undefined);
   }
 
-  private async waitForGenericBuffer() {
+  private async waitForGenericBuffer(): Promise<Result<void>> {
     if (this._data.bufferedAmount > this._data.bufferedAmountLowThreshold) {
-      await new Promise<void>((res) => {
-        const onBufferAmountLow = () => {
-          this._data.removeEventListener(
-            "bufferedamountlow",
-            onBufferAmountLow,
-          );
-          res();
-        };
+      const res = await result.fromPromise(
+        new Promise<void>((res, rej) => {
+          const waitTimeout = setTimeout(() => {
+            this._data.removeEventListener(
+              "bufferedamountlow",
+              onBufferAmountLow,
+            );
+            rej(
+              "Timeout of 500ms exceeded waiting for buffer space for message",
+            );
+          }, 500);
 
-        this._data.addEventListener("bufferedamountlow", onBufferAmountLow);
-      });
+          const onBufferAmountLow = () => {
+            this._data.removeEventListener(
+              "bufferedamountlow",
+              onBufferAmountLow,
+            );
+            clearTimeout(waitTimeout);
+            res();
+          };
+
+          this._data.addEventListener("bufferedamountlow", onBufferAmountLow);
+        }),
+      );
+
+      if (res.isError()) {
+        return result.err(res.error);
+      }
     }
+    return result.ok(undefined);
   }
 
-  async sendRaw<T extends JsonValue>(data: ArrayBuffer, metadata?: T) {
+  async sendRaw<T extends JsonValue>(
+    data: ArrayBuffer,
+    metadata?: T,
+  ): Promise<Result<void>> {
     const chunks = this._chunker.chunkData(data, metadata);
 
     for (const chunk of chunks) {
-      await this.waitForBinaryBuffer();
+      const waitRes = await this.waitForBinaryBuffer();
 
-      this._binaryData.send(chunk);
+      if (waitRes.isError()) {
+        return waitRes;
+      }
+
+      try {
+        this._binaryData.send(chunk);
+      } catch (err) {
+        return result.err(err as Error);
+      }
     }
+    return result.ok(undefined);
   }
 
-  async sendFile(file: File) {
+  async sendFile(file: File): Promise<Result<void>> {
     const fileMetadata: FileMetadata = {
       name: file.name,
       size: file.size,
@@ -325,13 +400,36 @@ export class P2PConnection<
       _internalIsFile: true,
     };
 
-    await this.sendRaw(await file.arrayBuffer(), fileMetadata);
+    return this.sendRaw(await file.arrayBuffer(), fileMetadata);
+  }
+
+  private async sendClosed() {
+    if (this._data.readyState !== "open") {
+      return;
+    }
+
+    const message = {
+      event: "connectionClosed",
+      args: [this._peerId],
+    } as unknown as InternalMessageEvent<InternalEvents>;
+
+    const waitRes = await this.waitForGenericBuffer();
+
+    if (waitRes.isError()) {
+      return;
+    }
+
+    try {
+      this._data.send(JSON.stringify(message));
+    } catch (e) {
+      this.callHandlers("error", e as Error);
+    }
   }
 
   async emit<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     ...args: Parameters<ClientToPeerEvents[TKey]>
-  ) {
+  ): Promise<Result<void>> {
     // TODO! handle the creation of this message better so that I don't have to
     // cast `as unknown as T` :puke:.
     const message = {
@@ -339,9 +437,17 @@ export class P2PConnection<
       args,
     } as unknown as InternalMessageEvent<ClientToPeerEvents>;
 
-    await this.waitForGenericBuffer();
+    const waitRes = await this.waitForGenericBuffer();
+    if (waitRes.isError()) {
+      return waitRes;
+    }
 
-    this._data.send(JSON.stringify(message));
+    try {
+      this._data.send(JSON.stringify(message));
+    } catch (e) {
+      return result.err(e as Error);
+    }
+    return result.ok(undefined);
   }
 
   once<TKey extends keyof InternalEvents>(
@@ -401,18 +507,37 @@ export class P2PConnection<
 
   async close() {
     const closeData = new Promise<void>((res) => {
+      if (this._data.readyState === "closed") {
+        res();
+        return;
+      }
       this._data.onclose = () => res();
     });
+    const closeBinaryData = new Promise<void>((res) => {
+      if (this._binaryData.readyState === "closed") {
+        res();
+        return;
+      }
+      this._binaryData.onclose = () => res();
+    });
     const closeConn = new Promise<void>((res) => {
-      this._connection.onconnectionstatechange = () => {
-        if (this._connection.connectionState === "closed") {
+      if (this._connection.connectionState === "closed") {
+        res();
+        return;
+      }
+      this._connection.onconnectionstatechange = async (evt) => {
+        const connection = evt.target as RTCPeerConnection;
+        if (connection.connectionState === "closed") {
+          await this.onClosed();
           res();
         }
       };
     });
 
+    await this.sendClosed();
     this._data.close();
+    this._binaryData.close();
     this._connection.close();
-    await Promise.all([closeData, closeConn]);
+    await Promise.all([closeData, closeBinaryData, closeConn]);
   }
 }

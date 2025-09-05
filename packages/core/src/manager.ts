@@ -274,6 +274,12 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
           maxChunkSize: this._maxChunkSizeBytes.unsafeUnwrap() as
             | number
             | undefined,
+          onClose: () => {
+            this._connectedPeers.delete(peerId);
+
+            // Failsafe just to make sure we cleanup any and all data from the P2PConnection
+            this._pendingPeers.delete(peerId);
+          },
         });
 
         this._pendingPeers.delete(peerId);
