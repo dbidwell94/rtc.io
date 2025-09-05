@@ -2,6 +2,9 @@ import { P2PConnection, type VoidMethods } from "./p2pConnection";
 import { type ClientSignaler, type PeerId } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 
+const DATA_CHANNEL_GENERIC = "generic";
+const DATA_CHANNEL_BINARY = "binary";
+
 const freeIceServers = [
   "stun:stun.l.google.com:19302",
   "stun:stun.l.google.com:5349",
@@ -64,6 +67,7 @@ export interface InternalEvents<
 interface PeerState {
   connection: RTCPeerConnection;
   data: Option<RTCDataChannel>;
+  binaryData: Option<RTCDataChannel>;
 }
 
 /**
@@ -242,14 +246,18 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
     if (peerStateOpt.isNone()) return () => {};
 
-    const { connection, data } = peerStateOpt.value;
+    const { connection, data, binaryData } = peerStateOpt.value;
 
-    const sendOff = (dataChannel: RTCDataChannel) => {
+    const sendOff = (
+      dataChannel: RTCDataChannel,
+      binaryDataChannel: RTCDataChannel,
+    ) => {
       dataChannel.onopen = null;
       this._events["connected"]?.forEach((callback) => {
         const clientConnection = new P2PConnection<ClientToPeerEvent>(
           connection,
           dataChannel,
+          binaryDataChannel,
           peerId,
         );
         this._pendingPeers.delete(peerId);
@@ -262,18 +270,31 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       switch (connection.connectionState) {
         case "connected": {
           // Make sure the data channel is also ready before handing off
-          if (data.isNone()) {
+          if (data.isNone() || binaryData.isNone()) {
             return;
           }
-          const dataChannel = data.value;
 
-          if (dataChannel.readyState !== "open") {
-            dataChannel.onopen = () => {
-              sendOff(dataChannel);
-            };
-          } else {
-            sendOff(dataChannel);
+          // If the data channels are not yet open, then we need to wait for them to be
+          // available before we send control to the P2PConnection
+          if (
+            data.value.readyState !== "open" ||
+            binaryData.value.readyState !== "open"
+          ) {
+            const connectData = [data.value, binaryData.value]
+              .filter((channel) => channel.readyState !== "open")
+              .map((channel) => {
+                return new Promise<void>((res) => {
+                  channel.onopen = () => {
+                    channel.onopen = null;
+                    res();
+                  };
+                });
+              });
+
+            await Promise.all(connectData);
           }
+
+          sendOff(data.value, binaryData.value);
           break;
         }
         case "failed": {
@@ -300,12 +321,24 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     const peerState: PeerState = {
       connection,
       data: option.none(),
+      binaryData: option.none(),
     };
     this._pendingPeers.set(peerId, peerState);
     connection.ondatachannel = ({ channel }) => {
-      peerState.data = option.some(channel);
-      this.onConnectionStateChanged(peerId)();
-      connection.ondatachannel = null;
+      switch (channel.label) {
+        case DATA_CHANNEL_GENERIC: {
+          peerState.data = option.some(channel);
+          break;
+        }
+        case DATA_CHANNEL_BINARY: {
+          peerState.binaryData = option.some(channel);
+        }
+      }
+
+      if (peerState.binaryData.isSome() && peerState.data.isSome()) {
+        this.onConnectionStateChanged(peerId)();
+        connection.ondatachannel = null;
+      }
     };
 
     connection.onicecandidate = ({ candidate }) => {
@@ -344,11 +377,15 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       return result.err("Peer already has or is pending a connection");
     }
     const connection = new RTCPeerConnection({ iceServers: this._iceServers });
-    const dataChannel = connection.createDataChannel(peerId);
+    const dataChannel = connection.createDataChannel(DATA_CHANNEL_GENERIC);
+    const binaryChannel = connection.createDataChannel(DATA_CHANNEL_BINARY);
+
     this._pendingPeers.set(peerId, {
       connection,
       data: option.some(dataChannel),
+      binaryData: option.some(binaryChannel),
     });
+
     this._signalingInterface.on("answer", this.onAnswer(peerId, connection));
     this._signalingInterface.on(
       "iceCandidate",

@@ -107,7 +107,7 @@ describe("src/p2pConnection/index.ts", () => {
     const [peer1, peer2] = await createPeers<Events>();
 
     const dataProm = new Promise<[Option<unknown>, ArrayBuffer]>((res) =>
-      peer2.on("data", (meta, data) => res([meta, data])),
+      peer2.on("data", (meta, data) => res([meta as Option<unknown>, data])),
     );
 
     peer1.sendRaw<Metadata>(data.buffer, metadata);
