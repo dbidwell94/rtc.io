@@ -7,6 +7,13 @@ import {
 } from "./binaryData";
 import { Option, result, Result } from "@dbidwell94/ts-utils";
 
+/**
+ * This event name is called when another peer has signaled to use
+ * that they are closing their stream. This will allow us to gracefully
+ * handle closing our stream.
+ */
+const INTERNAL_BYE = "____internal_goodbye";
+
 export interface FileMetadata extends JsonObject {
   name: File["name"];
   type: File["type"];
@@ -156,15 +163,6 @@ export class P2PConnection<
         }
       }
     };
-
-    this.setupListeners();
-  }
-
-  private setupListeners() {
-    this.on("connectionClosed", async () => {
-      console.log("Calling close handler from connectionClosed event");
-      await this.close();
-    });
   }
 
   private async onDataTimedOut(dataId: string) {
@@ -275,6 +273,12 @@ export class P2PConnection<
     try {
       const messageData: InternalMessageEvent<ClientToPeerEvents> =
         JSON.parse(data);
+
+      if (messageData.event === INTERNAL_BYE) {
+        await this.close();
+        return;
+      }
+
       await this.callHandlers(messageData.event, ...messageData.args);
     } catch (err) {
       await this.callHandlers("error", err as Error);
@@ -409,7 +413,7 @@ export class P2PConnection<
     }
 
     const message = {
-      event: "connectionClosed",
+      event: INTERNAL_BYE,
       args: [this._peerId],
     } as unknown as InternalMessageEvent<InternalEvents>;
 
