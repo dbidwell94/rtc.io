@@ -1,5 +1,10 @@
 import { PeerId } from "@rtcio/signaling";
-import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
+import {
+  BinaryChunker,
+  BinaryChunkerOptions,
+  JsonObject,
+  JsonValue,
+} from "./binaryData";
 import { Option } from "@dbidwell94/ts-utils";
 
 export interface FileMetadata extends JsonObject {
@@ -52,6 +57,14 @@ type InternalMessageEvent<T extends VoidMethods<T>> = {
 
 export type MaybePromise<T> = T | Promise<T>;
 
+export interface P2POptions
+  extends Pick<BinaryChunkerOptions, "maxChunkSize" | "dataTimeout"> {
+  peerId: PeerId;
+  connection: RTCPeerConnection;
+  genericDataChannel: RTCDataChannel;
+  binaryDataChannel: RTCDataChannel;
+}
+
 function metadataIsForFile(metadata: unknown): metadata is FileMetadata {
   if (!metadata) return false;
   if (typeof metadata !== "object") return false;
@@ -79,17 +92,23 @@ export class P2PConnection<
   private _binaryData: RTCDataChannel;
   private _peerId: PeerId;
 
-  constructor(
-    connection: RTCPeerConnection,
-    dataChannel: RTCDataChannel,
-    binaryDataChannel: RTCDataChannel,
-    peerId: PeerId,
-  ) {
+  constructor({
+    connection,
+    genericDataChannel,
+    binaryDataChannel,
+    peerId,
+    dataTimeout = 5_000, // 5 seconds
+    maxChunkSize = 1024, // 1KB
+  }: P2POptions) {
     this._connection = connection;
     this._peerId = peerId;
-    this._data = dataChannel;
+    this._data = genericDataChannel;
     this._binaryData = binaryDataChannel;
-    this._chunker = new BinaryChunker({ onDataTimeout: this.onDataTimedOut });
+    this._chunker = new BinaryChunker({
+      onDataTimeout: this.onDataTimedOut,
+      dataTimeout,
+      maxChunkSize,
+    });
     this._data.binaryType = "arraybuffer";
     this._binaryData.binaryType = "arraybuffer";
 

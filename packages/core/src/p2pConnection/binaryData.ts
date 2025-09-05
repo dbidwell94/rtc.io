@@ -35,7 +35,7 @@ interface ChunkHeader {
   isFinal: boolean;
 }
 
-interface ChunkerOptions {
+export interface BinaryChunkerOptions {
   maxChunkSize?: number;
   dataTimeout?: number;
   onDataTimeout: (dataId: string) => void;
@@ -76,7 +76,7 @@ export class BinaryChunker {
     maxChunkSize = 1024,
     dataTimeout = 5000,
     onDataTimeout,
-  }: ChunkerOptions) {
+  }: BinaryChunkerOptions) {
     if (maxChunkSize <= HEADER_BYTE_SIZE) {
       throw new Error(
         "Unable to create a BinaryChunker with a max packet size less than the header size",

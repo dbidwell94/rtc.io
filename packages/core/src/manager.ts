@@ -70,6 +70,14 @@ interface PeerState {
   binaryData: Option<RTCDataChannel>;
 }
 
+export interface RtcOptions {
+  signaler: ClientSignaler;
+  roomName: string;
+  iceServers?: RTCIceServer[];
+  dataTimeoutMs?: number;
+  maxChunkSizeBytes?: number;
+}
+
 /**
  * The base manager for all peer connections in the rtc.io library. This automatically handles
  * signaling to and from remote peers in order to create a `P2PConnection`
@@ -81,6 +89,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private _roomName: string;
   private _roomPeerId: Option<PeerId>;
   private _iceServers: RTCIceServer[];
+
+  private _dataTimeoutMs: Option<number>;
+  private _maxChunkSizeBytes: Option<number>;
 
   private _events: {
     [K in keyof InternalEvents<ClientToPeerEvent>]?: Set<
@@ -100,21 +111,21 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * @param iceServers - An optional list of ICE servers. If not provided, will use default
    * Google STUN servers
    */
-  constructor(
-    signalingInterface: ClientSignaler,
-    roomName: string,
-    iceServers: RTCIceServer[] = [
-      {
-        urls: freeIceServers,
-      },
-    ],
-  ) {
+  constructor({
+    roomName,
+    signaler: signalingInterface,
+    dataTimeoutMs,
+    iceServers = [{ urls: freeIceServers }],
+    maxChunkSizeBytes,
+  }: RtcOptions) {
     this._iceServers = iceServers;
     this._pendingPeers = new Map();
     this._connectedPeers = new Map();
     this._roomName = roomName;
     this._roomPeerId = option.none();
     this._signalingInterface = signalingInterface;
+    this._dataTimeoutMs = option.unknown(dataTimeoutMs);
+    this._maxChunkSizeBytes = option.unknown(maxChunkSizeBytes);
     this.setupListeners();
   }
 
@@ -254,12 +265,17 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     ) => {
       dataChannel.onopen = null;
       this._events["connected"]?.forEach((callback) => {
-        const clientConnection = new P2PConnection<ClientToPeerEvent>(
-          connection,
-          dataChannel,
+        const clientConnection = new P2PConnection<ClientToPeerEvent>({
           binaryDataChannel,
+          connection,
+          genericDataChannel: dataChannel,
           peerId,
-        );
+          dataTimeout: this._dataTimeoutMs.unsafeUnwrap() as number | undefined,
+          maxChunkSize: this._maxChunkSizeBytes.unsafeUnwrap() as
+            | number
+            | undefined,
+        });
+
         this._pendingPeers.delete(peerId);
         this._connectedPeers.set(peerId, clientConnection);
         callback(clientConnection);

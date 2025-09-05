@@ -12,13 +12,19 @@ interface Events {
 async function createPeers<T extends VoidMethods<T>>(): Promise<
   [P2PConnection<T>, P2PConnection<T>]
 > {
-  const manager1 = new RTC<T>(new LocalSignalServer("TEST"), "TEST");
+  const manager1 = new RTC<T>({
+    signaler: new LocalSignalServer("TEST"),
+    roomName: "TEST",
+  });
 
   const peer1Promise = new Promise<P2PConnection<T>>((res) => {
     manager1.on("connected", (peer) => res(peer));
   });
 
-  const manager2 = new RTC<T>(new LocalSignalServer("TEST"), "TEST");
+  const manager2 = new RTC<T>({
+    signaler: new LocalSignalServer("TEST"),
+    roomName: "TEST",
+  });
   const manager2Id = (await manager2.connectToRoom()).unwrap();
 
   const peer2Promise = new Promise<P2PConnection<T>>((res) => {
