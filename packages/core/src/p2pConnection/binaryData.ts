@@ -87,6 +87,11 @@ export class BinaryChunker {
     this._onDataTimeout = onDataTimeout;
   }
 
+  /**
+   * A read-only property which returns how many bytes a packets' header is.
+   * Class' 'maxChunkSize' should never be lower than this or an Error
+   * will be thrown
+   */
   static get HEADER_SIZE() {
     return HEADER_BYTE_SIZE;
   }
@@ -126,11 +131,19 @@ export class BinaryChunker {
     const timeoutHandler = () => {
       const optData = option.unknown(this._streams.get(dataId));
       if (optData.isNone()) return;
-      const { cleanupTimeout } = optData.value;
+      const { cleanupTimeout, controller } = optData.value;
 
       // final check to ensure the timeout is clear
       clearTimeout(cleanupTimeout);
+      // Signal to the caller that a timeout has occurred
       this._onDataTimeout(dataId);
+      // Close the controller with an error indicating that
+      // a timeout has occurred
+      controller.error(
+        new Error(
+          `Timeout of ${this._dataTimeoutMs} ms was reached when receiving packets`,
+        ),
+      );
     };
 
     const mainStream = new ReadableStream({
@@ -290,12 +303,22 @@ export class BinaryChunker {
       streamObj.currentChunkIndex++;
     }
 
+    // As we have just received a new chunk, we should reset the data timeout
+    // timer to ensure that we don't timeout on the WHOLE transfer, just when
+    // we don't receive a chunk
+    clearTimeout(streamObj.cleanupTimeout);
+
     // Final obj would have been at the last index. So if the buffer is empty
     // and we had the final object, then the data is complete and has all been
     // enqueued
     if (streamObj.hasFinal && buffers.length === 0) {
       controller.close();
       this._streams.delete(header.id);
+    } else {
+      streamObj.cleanupTimeout = setTimeout(
+        streamObj.timeoutHandler,
+        this._dataTimeoutMs,
+      );
     }
   }
 
