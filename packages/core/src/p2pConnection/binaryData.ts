@@ -5,7 +5,7 @@
 // 16 - 19 -- The index of the chunk this header is for
 // 20      -- boolean flag representing if this is the final chunk
 
-import { Option, option } from "@dbidwell94/ts-utils";
+import { Option, option, result, Result } from "@dbidwell94/ts-utils";
 
 /**
  * Represents any valid JSON-serializable primitive value.
@@ -47,16 +47,30 @@ export class BinaryChunker {
   private _chunks: Map<
     string,
     {
+      metadata: Option<unknown>;
       buffers: ArrayBuffer[];
       hasFinal: boolean;
       totalExpectedSize: number;
-      cleanupTimeout: ReturnType<typeof window.setTimeout>;
+      cleanupTimeout: ReturnType<typeof setTimeout>;
     }
   > = new Map();
 
   private _maxChunkSize: number;
   private _dataTimeoutMs: number;
   private _onDataTimeout: (dataId: string) => void;
+
+  private _streams: Map<
+    string,
+    {
+      controller: ReadableStreamDefaultController<Uint8Array>;
+      totalExpectedSize: number;
+      buffers: ArrayBuffer[];
+      hasFinal: boolean;
+      currentChunkIndex: number;
+      cleanupTimeout: ReturnType<typeof setTimeout>;
+      timeoutHandler: () => void;
+    }
+  > = new Map();
 
   constructor({
     maxChunkSize = 1024,
@@ -108,10 +122,80 @@ export class BinaryChunker {
     }
   }
 
+  setDataIsStream(dataId: string): Result<ReadableStream<Uint8Array>> {
+    const timeoutHandler = () => {
+      const optData = option.unknown(this._streams.get(dataId));
+      if (optData.isNone()) return;
+      const { cleanupTimeout } = optData.value;
+
+      // final check to ensure the timeout is clear
+      clearTimeout(cleanupTimeout);
+      this._onDataTimeout(dataId);
+    };
+
+    const mainStream = new ReadableStream({
+      cancel: () => {
+        const streamObj = option.unknown(this._streams.get(dataId));
+        if (streamObj.isNone()) return;
+
+        const { cleanupTimeout } = streamObj.value;
+
+        clearTimeout(cleanupTimeout);
+        this._streams.delete(dataId);
+      },
+      start: (controller) => {
+        const chunksObj = option
+          .unknown(this._chunks.get(dataId))
+          .okOr("Unable to get chunks from internal BinaryChunker state");
+        if (chunksObj.isError()) {
+          return result.err(chunksObj.error);
+        }
+        const { buffers, cleanupTimeout, hasFinal, totalExpectedSize } =
+          chunksObj.value;
+
+        // remove the metadata from the start of the buffer. The user already has it.
+        buffers.shift();
+
+        clearTimeout(cleanupTimeout);
+
+        this._streams.set(dataId, {
+          buffers,
+          controller,
+          hasFinal: hasFinal,
+          totalExpectedSize,
+          cleanupTimeout: setTimeout(timeoutHandler, this._dataTimeoutMs),
+          timeoutHandler,
+          // Starting with index 1 because index 0 SHOULD be the metadata,
+          // which has been removed from the buffer array
+          currentChunkIndex: 1,
+        });
+
+        this._chunks.delete(dataId);
+      },
+    });
+
+    return result.ok(mainStream);
+  }
+
   receiveChunk<T extends JsonValue = null>(
     chunk: ArrayBuffer,
-  ): Option<{ data: ArrayBuffer; metadata: Option<T> }> {
+  ): {
+    data: Option<ArrayBuffer>;
+    metadata: Option<T>;
+    id: string;
+    isStream: boolean;
+  } {
     const header = this.parseHeaderFromBuffer(chunk);
+
+    if (this._streams.has(header.id)) {
+      this.handleStream(chunk.slice(HEADER_BYTE_SIZE), header);
+      return {
+        data: option.none(),
+        id: header.id,
+        isStream: true,
+        metadata: option.none(),
+      };
+    }
 
     const createCleanupTimeout = (
       currentTimeout?: ReturnType<typeof window.setTimeout>,
@@ -127,6 +211,7 @@ export class BinaryChunker {
 
     if (!this._chunks.has(header.id)) {
       this._chunks.set(header.id, {
+        metadata: option.none(),
         buffers: [],
         hasFinal: false,
         totalExpectedSize: 0,
@@ -137,6 +222,11 @@ export class BinaryChunker {
       this._chunks.get(header.id)!.cleanupTimeout = createCleanupTimeout(
         this._chunks.get(header.id)!.cleanupTimeout,
       );
+    }
+
+    if (header.chunkIndex === 0) {
+      const metadata = this.parseMetadata(chunk.slice(HEADER_BYTE_SIZE));
+      this._chunks.get(header.id)!.metadata = metadata;
     }
 
     const { buffers: transfer } = this._chunks.get(header.id)!;
@@ -153,18 +243,60 @@ export class BinaryChunker {
       Object.keys(transfer).length ===
         this._chunks.get(header.id)!.totalExpectedSize
     ) {
-      const metadataBuffer = transfer.shift()!;
-      const metadata = this.parseMetadata<T>(metadataBuffer);
+      // remove the metadata buffer from the transfer array. No longer needed.
+      transfer.shift()!;
 
       const assembled = this.concatBuffers(...transfer);
 
       clearTimeout(this._chunks.get(header.id)!.cleanupTimeout);
+      const metadata = this._chunks.get(header.id)!.metadata as Option<T>;
       this._chunks.delete(header.id);
 
-      return option.some({ data: assembled, metadata });
+      return {
+        data: option.some(assembled),
+        metadata,
+        id: header.id,
+        isStream: false,
+      };
     }
 
-    return option.none();
+    return {
+      data: option.none(),
+      metadata: this._chunks.get(header.id)!.metadata as Option<T>,
+      id: header.id,
+      isStream: false,
+    };
+  }
+
+  private handleStream(dataNoHeader: ArrayBuffer, header: ChunkHeader) {
+    // We have already checked that this is a valid reference in `receiveChunk`
+    const streamObj = this._streams.get(header.id)!;
+
+    // At this point, the metadata has already been removed from this buffer. This buffer
+    // is full of nothing but raw data with no headers
+    const { buffers, controller } = streamObj;
+
+    if (header.isFinal) {
+      streamObj.hasFinal = true;
+      streamObj.totalExpectedSize = header.chunkIndex;
+    }
+
+    buffers[header.chunkIndex - streamObj.currentChunkIndex] = dataNoHeader;
+
+    // check if the 0 index is ready to go, iterate until we find an undefined value
+    while (buffers[0]) {
+      const dataToSend = buffers.shift()!;
+      controller.enqueue(new Uint8Array(dataToSend));
+      streamObj.currentChunkIndex++;
+    }
+
+    // Final obj would have been at the last index. So if the buffer is empty
+    // and we had the final object, then the data is complete and has all been
+    // enqueued
+    if (streamObj.hasFinal && buffers.length === 0) {
+      controller.close();
+      this._streams.delete(header.id);
+    }
   }
 
   private buildHeader(

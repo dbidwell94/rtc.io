@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "react-jsx",
     "esModuleInterop": true,
     "composite": true,
     "sourceMap": true,

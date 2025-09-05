@@ -1,5 +1,4 @@
-import { option, Option } from "@dbidwell94/ts-utils";
-import { BinaryChunker, JsonObject, JsonValue } from "./binaryData";
+import { BinaryChunker, JsonObject } from "./binaryData";
 
 describe("src/p2pConnection/binaryData.ts", () => {
   afterEach(() => {
@@ -103,20 +102,20 @@ describe("src/p2pConnection/binaryData.ts", () => {
     // 5 chunks and 1 metadata
     expect(chunks).toHaveLength(6);
 
-    let finalChunk: ReturnType<typeof chunker.receiveChunk> = option.none();
+    let finalChunk = chunker.receiveChunk(chunks.pop()!);
     for (const chunk of chunks) {
       finalChunk = chunker.receiveChunk(chunk);
-      if (finalChunk.isSome()) {
+      if (finalChunk.data.isSome()) {
         break;
       }
     }
 
-    expect(finalChunk.isSome()).toBeTruthy();
-    const { data: assembledData, metadata } = finalChunk.unwrap();
+    expect(finalChunk.data.isSome()).toBeTruthy();
+    const { data: assembledData, metadata } = finalChunk;
 
     // we didn't pass any metadata in, so we don't have any
     expect(metadata.isNone()).toBeTruthy();
-    expect(assembledData).toEqual(data.buffer);
+    expect(assembledData.unwrap()).toEqual(data.buffer);
   });
 
   it("Returns metadata correctly", () => {
@@ -130,21 +129,21 @@ describe("src/p2pConnection/binaryData.ts", () => {
       item1: "Hello, World!",
     };
 
-    const chunks = chunker.chunkData<Metadata>(data.buffer, metadata);
+    const chunks = Array.from(
+      chunker.chunkData<Metadata>(data.buffer, metadata),
+    );
 
-    let assembled: ReturnType<typeof chunker.receiveChunk<Metadata>> =
-      option.none();
+    let assembled = chunker.receiveChunk(chunks.pop()!);
 
     for (const chunk of chunks) {
       assembled = chunker.receiveChunk(chunk);
-      if (assembled.isSome()) {
+      if (assembled.data.isSome()) {
         break;
       }
     }
 
-    expect(assembled.isSome()).toBeTruthy();
-    const { metadata: recvMetadata } = assembled.unwrap();
-    expect(recvMetadata.unwrap()).toEqual(metadata);
+    expect(assembled.data.isSome()).toBeTruthy();
+    expect(assembled.metadata.unwrap()).toEqual(metadata);
   });
 
   it("Can reassemble data correctly if it is received in an incorrect order", async () => {
@@ -171,22 +170,22 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     expect(chunks).toHaveLength(6);
 
-    let recvOpt: ReturnType<typeof chunker.receiveChunk> = option.none();
+    let recvOpt = chunker.receiveChunk(chunks.pop()!);
 
     for (const chunk of chunks.reverse()) {
       recvOpt = chunker.receiveChunk(chunk);
-      if (recvOpt.isSome()) {
+      if (recvOpt.data.isSome()) {
         break;
       }
     }
 
-    expect(recvOpt.isSome()).toBeTruthy();
+    expect(recvOpt.data.isSome()).toBeTruthy();
 
-    const { data, metadata: recvMetadata } = recvOpt.unwrap();
+    const { data, metadata: recvMetadata } = recvOpt;
 
     expect(recvMetadata.isSome()).toBeTruthy();
 
-    expect(data).toEqual(expectedData.buffer);
+    expect(data.unwrap()).toEqual(expectedData.buffer);
     expect(recvMetadata.unwrap()).toEqual(metadata);
   });
 
@@ -207,17 +206,17 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const id = chunker["parseHeaderFromBuffer"](chunk1).id;
 
-    expect(chunker.receiveChunk(chunk1).isNone()).toBeTruthy();
+    expect(chunker.receiveChunk(chunk1).data.isNone()).toBeTruthy();
     jest.advanceTimersByTime(timeout - 1);
     expect(dataTimeoutCallback).not.toHaveBeenCalled();
     expect(chunker["_chunks"].size).toEqual(1);
 
-    expect(chunker.receiveChunk(chunk2).isNone()).toBeTruthy();
+    expect(chunker.receiveChunk(chunk2).data.isNone()).toBeTruthy();
     // A new chunk was received. This should reset the timeout.
     jest.advanceTimersByTime(timeout - 1);
     expect(dataTimeoutCallback).not.toHaveBeenCalled();
 
-    expect(chunker.receiveChunk(chunk3).isNone()).toBeTruthy();
+    expect(chunker.receiveChunk(chunk3).data.isNone()).toBeTruthy();
     jest.advanceTimersByTime(timeout);
     expect(dataTimeoutCallback).toHaveBeenCalledTimes(1);
     expect(dataTimeoutCallback).toHaveBeenCalledWith(id);
@@ -244,20 +243,19 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     expect(chunks).toHaveLength(chunks1.length + chunks2.length);
 
-    const assembled: Array<{ data: ArrayBuffer; metadata: Option<JsonValue> }> =
-      [];
+    const assembled: Array<ReturnType<typeof chunker.receiveChunk>> = [];
 
     for (const chunk of chunks) {
       const res = chunker.receiveChunk(chunk);
 
-      if (res.isSome()) {
-        assembled.push(res.value);
+      if (res.data.isSome()) {
+        assembled.push(res);
       }
     }
 
     expect(assembled).toHaveLength(2);
 
-    expect([assembled[0].data, assembled[1].data]).toEqual(
+    expect([assembled[0].data.unwrap(), assembled[1].data.unwrap()]).toEqual(
       expect.arrayContaining([expected1.buffer, expected2.buffer]),
     );
   });

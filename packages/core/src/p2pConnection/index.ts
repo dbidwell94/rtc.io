@@ -12,15 +12,24 @@ export interface FileMetadata extends JsonObject {
 
 export interface InternalEvents {
   connectionClosed: (peerId: PeerId) => MaybePromise<void>;
+
   data: <T extends JsonValue>(
     metadata: Option<T>,
     binaryData: ArrayBuffer,
   ) => MaybePromise<void>;
+
   file: (
-    metadata: Option<Omit<FileMetadata, "_internalIsFile">>,
+    metadata: Omit<FileMetadata, "_internalIsFile">,
     binaryData: Blob,
   ) => MaybePromise<void>;
+
+  fileStream: (
+    metadata: Omit<FileMetadata, "_internalIsFile">,
+    binaryData: ReadableStream<Uint8Array>,
+  ) => MaybePromise<void>;
+
   dataTimedOut: (dataId: string) => MaybePromise<void>;
+
   error: (error: Error) => MaybePromise<void>;
 }
 
@@ -41,7 +50,13 @@ type InternalMessageEvent<T extends VoidMethods<T>> = {
   };
 }[keyof T];
 
-type MaybePromise<T> = T | Promise<T>;
+export type MaybePromise<T> = T | Promise<T>;
+
+function metadataIsForFile(metadata: unknown): metadata is FileMetadata {
+  if (!metadata) return false;
+  if (typeof metadata !== "object") return false;
+  return "_internalIsFile" in metadata;
+}
 
 export class P2PConnection<
   ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
@@ -138,37 +153,89 @@ export class P2PConnection<
   }
 
   private async handleBinaryData(data: ArrayBuffer) {
-    const optData = this._chunker.receiveChunk<FileMetadata | JsonValue>(data);
+    const {
+      data: optData,
+      id,
+      metadata: optMetadata,
+      isStream,
+    } = this._chunker.receiveChunk<FileMetadata | JsonValue>(data);
+
+    // This is already handled by a ReadableStream
+    if (isStream) {
+      return;
+    }
+
+    if (
+      optMetadata.isSome() &&
+      metadataIsForFile(optMetadata.value) &&
+      ((this._events["fileStream"]?.size ?? 0 > 0) ||
+        (this._oneShotEvents["fileStream"]?.size ?? 0 > 0))
+    ) {
+      this.handleFileStream(id, optMetadata.value);
+    }
 
     if (optData.isSome()) {
-      const { data, metadata } = optData.value;
+      const data = optData.value;
 
-      if (
-        metadata &&
-        typeof metadata === "object" &&
-        "_internalIsFile" in metadata
-      ) {
+      if (optMetadata.isSome() && metadataIsForFile(optMetadata.value)) {
         const fileBlob = new Blob([data]);
 
         for (const callback of this._events["file"] ?? []) {
-          await callback(metadata as Option<FileMetadata>, fileBlob);
+          await callback(optMetadata.value, fileBlob);
         }
 
         for (const callback of this._oneShotEvents["file"] ?? []) {
-          await callback(metadata as Option<FileMetadata>, fileBlob);
+          await callback(optMetadata.value, fileBlob);
           this._oneShotEvents["file"]?.delete(callback);
         }
         return;
       }
 
       for (const callback of this._events["data"] ?? []) {
-        await callback(optData.value.metadata, optData.value.data);
+        await callback(optMetadata, optData.value);
       }
 
       for (const callback of this._oneShotEvents["data"] ?? []) {
-        await callback(optData.value.metadata, optData.value.data);
+        await callback(optMetadata, optData.value);
         this._oneShotEvents["data"]?.delete(callback);
       }
+    }
+  }
+
+  private async handleFileStream(fileId: string, metadata: FileMetadata) {
+    const mainStreamResult = this._chunker.setDataIsStream(fileId);
+
+    if (mainStreamResult.isError()) {
+      this.emitError(mainStreamResult.error);
+      return;
+    }
+
+    const mainStream = mainStreamResult.value;
+
+    const listeners: Array<EventMap<ClientToPeerEvents>["fileStream"]> =
+      Array.from(this._events["fileStream"] ?? []).concat(
+        Array.from(this._oneShotEvents["fileStream"] ?? []),
+      );
+
+    if (listeners.length === 1) {
+      const [callback] = listeners;
+      callback(metadata, mainStream);
+      this._oneShotEvents["fileStream"]?.delete(callback);
+    } else {
+      const streams: Array<ReadableStream<Uint8Array>> = mainStream.tee();
+      // tee will basically push the data on a 'conveyer belt' down the line.
+      // It creates new ReadableStream objects that are NOT copies. More just
+      // pit stops on the way to the final location.
+      // const [stream1, stream2] = item.tee();
+      // PEER ->->->->-> stream1 ->->->-> stream2
+      for (let i = 0; i < listeners.length - 2; i++) {
+        streams.push(...streams.pop()!.tee());
+      }
+
+      listeners.forEach((callback, index) => {
+        callback(metadata, streams[index]);
+        this._oneShotEvents["fileStream"]?.delete(callback);
+      });
     }
   }
 
