@@ -42,4 +42,10 @@ export default {
   },
   setupFilesAfterEnv: ["./jest.setup.js"],
   moduleNameMapper,
+  collectCoverageFrom: [
+    "<rootDir>/packages/*/src/**/*.ts",
+    "<rootDir>/packages/*/src/**/*.tsx",
+  ],
+  coveragePathIgnorePatterns: ["<rootDir>/packages/*/dist/"],
+  collectCoverage: true,
 };

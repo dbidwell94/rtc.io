@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "react-jsx",
     "esModuleInterop": true,
     "composite": true,
     "sourceMap": true,
@@ -15,6 +16,7 @@
     "rootDir": "."
   },
   "files": [],
+  "exclude": ["./jest.setup.js"],
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/signalLocalBrowser" },
