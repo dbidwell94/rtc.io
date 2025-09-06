@@ -153,11 +153,6 @@ export class BinaryChunker {
           bufferCursor += bytesToCopy;
 
           if (bufferCursor === this._maxChunkSize) {
-            console.log({
-              valueCursor,
-              valueByteLength: value.byteLength,
-              readDone,
-            });
             // Have to create a copy, otherwise will be overwriting the buffer before
             // it has been sent.
             yield this.buildHeader(
