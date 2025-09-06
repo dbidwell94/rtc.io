@@ -67,6 +67,7 @@ export default class LocalSignalServer implements ClientSignaler {
   on<E extends keyof SignalerEvents>(
     event: E,
     listener: SignalerEvents[E],
+    abortSignal?: AbortSignal,
   ): void {
     const wrapper = (e: Event) => {
       const payload = (e as CustomEvent<Parameters<SignalerEvents[E]>>).detail;
@@ -78,7 +79,15 @@ export default class LocalSignalServer implements ClientSignaler {
     // We need to store the references for when we call `off` later
     this.eventHandlers.set(listener, wrapper);
 
-    this._emitter.addEventListener(event, wrapper);
+    if (abortSignal) {
+      const abort = () => {
+        abortSignal.removeEventListener("abort", abort);
+        this.eventHandlers.delete(listener);
+      };
+      abortSignal.addEventListener("abort", abort);
+    }
+
+    this._emitter.addEventListener(event, wrapper, { signal: abortSignal });
   }
 
   off<E extends keyof SignalerEvents>(

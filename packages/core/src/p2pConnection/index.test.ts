@@ -10,10 +10,10 @@ interface Events {
 }
 
 async function createPeers<T extends VoidMethods<T>>(
-  options?: Partial<Omit<RtcOptions, "signaler">>,
+  options?: Partial<Omit<RtcOptions, "signaler" | "roomName">>,
 ): Promise<[P2PConnection<T>, P2PConnection<T>, RTC<T>, RTC<T>]> {
   const opts: Omit<RtcOptions, "signaler"> = {
-    roomName: options?.roomName ?? "TEST",
+    roomName: crypto.randomUUID(),
     dataTimeoutMs: options?.dataTimeoutMs,
     iceServers: options?.iceServers,
     maxChunkSizeBytes: options?.maxChunkSizeBytes,

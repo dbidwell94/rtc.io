@@ -9,7 +9,7 @@ let signal2: LocalSignal;
 let peer1Id: PeerId;
 let peer2Id: PeerId;
 
-const ROOM_NAME = "ROOM";
+let ROOM_NAME: string;
 
 async function closePeers(...peers: RTC<never>[]) {
   await Promise.all(peers.map(async (peer) => await peer.close()));
@@ -22,6 +22,8 @@ describe("src/manager.ts", () => {
 
     peer1Id = (await signal1.connectToRoom()).unwrap();
     peer2Id = (await signal2.connectToRoom()).unwrap();
+
+    ROOM_NAME = crypto.randomUUID();
   });
 
   it("Connects 2 peers together", async () => {
