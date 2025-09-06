@@ -2,6 +2,17 @@ import { FileMetadata } from ".";
 import { BinaryChunker, JsonObject } from "./binaryData";
 import waitFor from "wait-for-expect";
 
+async function collectGeneratorValues<T>(
+  generator: AsyncGenerator<T>,
+): Promise<T[]> {
+  const toReturn: T[] = [];
+
+  for await (const item of generator) {
+    toReturn.push(item);
+  }
+  return toReturn;
+}
+
 describe("src/p2pConnection/binaryData.ts", () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -22,19 +33,20 @@ describe("src/p2pConnection/binaryData.ts", () => {
     ).not.toThrow();
   });
 
-  it("Returns the correct amount of chunks", () => {
+  it("Returns the correct amount of chunks", async () => {
     const binaryData = new Uint8Array([1, 2, 3, 4, 5, 6]).buffer;
     const chunker = new BinaryChunker({
       onDataTimeout: jest.fn(),
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
-    const data = Array.from(chunker.chunkData(binaryData));
+    const data = await collectGeneratorValues(chunker.chunkData(binaryData));
 
-    // We expect 7 here because we also have a metadata chunk returned
-    expect(data).toHaveLength(7);
+    // We expect 8 here because we also have a metadata chunk returned.
+    // We also have an empty buffer that is a 'terminator'
+    expect(data).toHaveLength(8);
   });
 
-  it("Sets headers on the chunks as expected", () => {
+  it("Sets headers on the chunks as expected", async () => {
     const binaryData = new Uint8Array([1, 2]).buffer;
     const chunker = new BinaryChunker({
       onDataTimeout: jest.fn(),
@@ -42,11 +54,14 @@ describe("src/p2pConnection/binaryData.ts", () => {
     });
 
     // First chunk is metadata
-    const [, data, data2] = chunker.chunkData(binaryData);
+    const [, data, data2, data3] = await collectGeneratorValues(
+      chunker.chunkData(binaryData),
+    );
 
     // this is a workaround to allow the calling of private methods in a class
     const header1 = chunker["parseHeaderFromBuffer"](data);
     const header2 = chunker["parseHeaderFromBuffer"](data2);
+    const header3 = chunker["parseHeaderFromBuffer"](data3);
 
     expect(header1).toEqual({
       chunkIndex: 1,
@@ -58,6 +73,12 @@ describe("src/p2pConnection/binaryData.ts", () => {
     expect(header2).toEqual({
       chunkIndex: 2,
       id: expect.any(String),
+      isFinal: false,
+    });
+
+    expect(header3).toEqual({
+      chunkIndex: 3,
+      id: expect.any(String),
       isFinal: true,
     });
 
@@ -67,21 +88,25 @@ describe("src/p2pConnection/binaryData.ts", () => {
   it.each([
     [BinaryChunker.HEADER_SIZE + 1, new Uint8Array([1]).buffer],
     [BinaryChunker.HEADER_SIZE + 2, new Uint8Array([1, 2]).buffer],
-  ])("Should be an expected size of %s bytes", (expectedBufferSize, buffer) => {
-    const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
-    const [, data] = chunker.chunkData(buffer);
+  ])(
+    "Should be an expected size of %s bytes",
+    async (expectedBufferSize, buffer) => {
+      const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+      const [, data] = await collectGeneratorValues(chunker.chunkData(buffer));
 
-    expect(data.byteLength).toEqual(expectedBufferSize);
-  });
+      expect(data.byteLength).toEqual(expectedBufferSize);
+    },
+  );
 
-  it("Encodes metadata correctly", () => {
+  it("Encodes metadata correctly", async () => {
     const expectedMetadata = { testKey: "testValue" };
     const encoded = new TextEncoder().encode(JSON.stringify(expectedMetadata));
 
     const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
-    const [metadata] = chunker.chunkData(
-      new Uint8Array([1, 2, 3, 4, 5]).buffer,
-      { testKey: "testValue" },
+    const [metadata] = await collectGeneratorValues(
+      chunker.chunkData(new Uint8Array([1, 2, 3, 4, 5]).buffer, {
+        testKey: "testValue",
+      }),
     );
 
     expect(metadata.byteLength).toEqual(
@@ -92,7 +117,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     expect(metadata.slice(BinaryChunker.HEADER_SIZE)).toEqual(encoded.buffer);
   });
 
-  it("Assembles data back together correctly", () => {
+  it("Assembles data back together correctly", async () => {
     const data = new Uint8Array([1, 2, 3, 4, 5]);
 
     const chunker = new BinaryChunker({
@@ -100,9 +125,9 @@ describe("src/p2pConnection/binaryData.ts", () => {
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
-    const chunks = Array.from(chunker.chunkData(data.buffer));
-    // 5 chunks and 1 metadata
-    expect(chunks).toHaveLength(6);
+    const chunks = await collectGeneratorValues(chunker.chunkData(data.buffer));
+    // 5 chunks and 1 metadata + 1 terminal buffer
+    expect(chunks).toHaveLength(7);
 
     let finalChunk = chunker.receiveChunk(chunks.pop()!);
     for (const chunk of chunks) {
@@ -120,7 +145,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     expect(assembledData.unwrap()).toEqual(data.buffer);
   });
 
-  it("Returns metadata correctly", () => {
+  it("Returns metadata correctly", async () => {
     interface Metadata extends JsonObject {
       item1: string;
     }
@@ -131,7 +156,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
       item1: "Hello, World!",
     };
 
-    const chunks = Array.from(
+    const chunks = await collectGeneratorValues(
       chunker.chunkData<Metadata>(data.buffer, metadata),
     );
 
@@ -166,11 +191,11 @@ describe("src/p2pConnection/binaryData.ts", () => {
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
-    const chunks = Array.from(
+    const chunks = await collectGeneratorValues(
       chunker.chunkData<Metadata>(expectedData.buffer, metadata),
     );
 
-    expect(chunks).toHaveLength(6);
+    expect(chunks).toHaveLength(7);
 
     let recvOpt = chunker.receiveChunk(chunks.pop()!);
 
@@ -204,7 +229,9 @@ describe("src/p2pConnection/binaryData.ts", () => {
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
-    const [chunk1, chunk2, chunk3] = Array.from(chunker.chunkData(data.buffer));
+    const [chunk1, chunk2, chunk3] = await collectGeneratorValues(
+      chunker.chunkData(data.buffer),
+    );
 
     const id = chunker["parseHeaderFromBuffer"](chunk1).id;
 
@@ -234,8 +261,12 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
 
-    const chunks1 = Array.from(chunker.chunkData(expected1.buffer));
-    const chunks2 = Array.from(chunker.chunkData(expected2.buffer));
+    const chunks1 = await collectGeneratorValues(
+      chunker.chunkData(expected1.buffer),
+    );
+    const chunks2 = await collectGeneratorValues(
+      chunker.chunkData(expected2.buffer),
+    );
 
     const chunks: ArrayBuffer[] = [];
     for (let i = 0; i < chunks1.length; i++) {
@@ -278,7 +309,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
       onDataTimeout: jest.fn(),
     });
 
-    const chunks = Array.from(
+    const chunks = await collectGeneratorValues(
       chunker.chunkData<FileMetadata>(fileData.buffer, expectedMetadata),
     );
 
@@ -337,7 +368,9 @@ describe("src/p2pConnection/binaryData.ts", () => {
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
-    const chunks = Array.from(chunker.chunkData(fileData.buffer, metadata));
+    const chunks = await collectGeneratorValues(
+      chunker.chunkData(fileData.buffer, metadata),
+    );
 
     // reverse the elements to simulate an out-of-order sender
     chunks.reverse();

@@ -96,35 +96,18 @@ export class BinaryChunker {
     return HEADER_BYTE_SIZE;
   }
 
-  *chunkData<T extends JsonValue = null>(
+  chunkData<T extends JsonValue = null>(
     dataToChunk: ArrayBuffer,
     metadata?: T,
-  ): Generator<ArrayBuffer> {
-    const dataId = crypto.randomUUID();
+  ): AsyncGenerator<ArrayBuffer> {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(dataToChunk));
+        controller.close();
+      },
+    });
 
-    const dataIdBytes = this.uuidToBytes(dataId);
-
-    const payloadSize = this._maxChunkSize - HEADER_BYTE_SIZE;
-
-    // adding 1 here because of the metadata chunk
-    const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
-
-    let chunkId = 1;
-
-    yield this.buildMetadata(metadata ?? null, dataIdBytes);
-
-    for (let i = 0; i < dataToChunk.byteLength; i += payloadSize) {
-      const isLastChunk = chunkId === totalChunks;
-
-      const header = this.buildHeader(dataIdBytes, chunkId, isLastChunk);
-
-      const start = i;
-      const end = Math.min(i + payloadSize, dataToChunk.byteLength);
-      const chunkPayload = dataToChunk.slice(start, end);
-
-      chunkId += 1;
-      yield this.concatBuffers(header, chunkPayload);
-    }
+    return this.streamData(stream, metadata);
   }
 
   async *streamData<T extends JsonValue = null>(
