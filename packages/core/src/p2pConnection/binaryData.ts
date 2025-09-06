@@ -155,7 +155,7 @@ export class BinaryChunker {
         // represents where in the current {value} we are.
         let valueCursor = 0;
 
-        while (valueCursor < value.byteLength - 1) {
+        while (valueCursor < value.byteLength) {
           const spaceInBuffer = this._maxChunkSize - bufferCursor;
           const dataLeftInBytes = value.byteLength - valueCursor;
           const bytesToCopy = Math.min(spaceInBuffer, dataLeftInBytes);
@@ -170,12 +170,17 @@ export class BinaryChunker {
           bufferCursor += bytesToCopy;
 
           if (bufferCursor === this._maxChunkSize) {
+            console.log({
+              valueCursor,
+              valueByteLength: value.byteLength,
+              readDone,
+            });
             // Have to create a copy, otherwise will be overwriting the buffer before
             // it has been sent.
             yield this.buildHeader(
               dataIdBytes,
               chunkIndex,
-              readDone && dataLeftInBytes === 0,
+              false,
               buffer.buffer,
             ).slice(0);
             chunkIndex += 1;
@@ -191,6 +196,8 @@ export class BinaryChunker {
         // buffer variable
         this.buildHeader(dataIdBytes, chunkIndex, true, buffer.buffer);
         yield buffer.slice(0, bufferCursor).buffer;
+      } else {
+        yield this.buildHeader(dataIdBytes, chunkIndex, true);
       }
     } finally {
       reader.releaseLock();

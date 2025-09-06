@@ -378,4 +378,82 @@ describe("src/p2pConnection/binaryData.ts", () => {
     expect(chunker["_streams"].size).toEqual(0);
     expect(chunker["_chunks"].size).toEqual(0);
   });
+
+  it("Accepts a ReadableStream when generating chunks", async () => {
+    interface Metadata extends JsonObject {
+      testName: string;
+    }
+    const metadata: Metadata = {
+      testName: "HELLO WORLD",
+    };
+    const fileData = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const file = new File([fileData], "test.txt");
+    const fileStream = file.stream();
+
+    const chunker = new BinaryChunker({
+      maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
+      onDataTimeout: jest.fn(),
+    });
+
+    const chunks: ArrayBuffer[] = [];
+    for await (const chunk of chunker.streamData(fileStream, metadata)) {
+      chunks.push(chunk);
+    }
+
+    const finalChunk = chunks[chunks.length - 1];
+    expect(chunker["parseHeaderFromBuffer"](finalChunk).isFinal).toBeTruthy();
+
+    // 10 bytes + 1 metadata header + one final chunk with only a header
+    // to signal that we have closed the stream
+    expect(chunks).toHaveLength(12);
+
+    let assembled = chunker.receiveChunk<Metadata>(chunks.pop()!);
+    for (const chunk of chunks) {
+      assembled = chunker.receiveChunk(chunk);
+    }
+
+    expect(assembled.data.isSome()).toBeTruthy();
+    expect(assembled.data.unwrap()).toEqual(fileData.buffer);
+    expect(assembled.metadata.isSome()).toBeTruthy();
+    expect(assembled.metadata.unwrap()).toEqual(metadata);
+  });
+
+  it("Correctly generates chunks from a ReadableStream with an odd chunkSize according to the buffer length", async () => {
+    interface Metadata extends JsonObject {
+      someString: string;
+    }
+    const metadata: Metadata = {
+      someString: "HELLO WORLD!",
+    };
+    const fileData = new Uint8Array([1, 2, 3, 4, 5]);
+    const file = new File([fileData], "text.txt");
+    const fileStream = file.stream();
+
+    const chunker = new BinaryChunker({
+      maxChunkSize: BinaryChunker.HEADER_SIZE + 2,
+      onDataTimeout: jest.fn(),
+    });
+
+    const chunks: ArrayBuffer[] = [];
+
+    for await (const chunk of chunker.streamData(fileStream, metadata)) {
+      chunks.push(chunk);
+    }
+
+    // 1 metadata chunk and 3 data chunks
+    expect(chunks).toHaveLength(4);
+    expect(
+      chunker["parseHeaderFromBuffer"](chunks[chunks.length - 1]).isFinal,
+    ).toBeTruthy();
+
+    let assembled = chunker.receiveChunk<Metadata>(chunks.pop()!);
+    for (const chunk of chunks) {
+      assembled = chunker.receiveChunk(chunk);
+    }
+
+    expect(assembled.data.isSome()).toBeTruthy();
+    expect(assembled.data.unwrap()).toEqual(fileData.buffer);
+    expect(assembled.metadata.isSome()).toBeTruthy();
+    expect(assembled.metadata.unwrap()).toEqual(metadata);
+  });
 });
