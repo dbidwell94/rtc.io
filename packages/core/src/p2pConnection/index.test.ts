@@ -216,6 +216,69 @@ describe("src/p2pConnection/index.ts", () => {
     await close(peer1, peer2, m1, m2);
   });
 
+  it("Sends the file as a stream", async () => {
+    const onError = jest.fn();
+    // create a new ArrayBuffer with 512KB of data, with each byte set to its index % 256
+    const buffer = new Uint8Array(1024 * 512);
+    for (let i = 0; i < buffer.length; i++) {
+      buffer[i] = i % 256;
+    }
+    const fileOpts: FilePropertyBag = {
+      type: "text/plain",
+      lastModified: Date.now(),
+    };
+    const file = new File([buffer], "largefile.txt", fileOpts);
+    // Set max chunk size to 1KB to force chunking
+    const [peer1, peer2, m1, m2] = await createPeers({
+      maxChunkSizeBytes: 1024,
+    });
+
+    let resolveData: (
+      value: [Parameters<InternalEvents["fileStream"]>[0], Uint8Array]
+    ) => void;
+    const dataProm = new Promise<
+      [Parameters<InternalEvents["fileStream"]>[0], Uint8Array]
+    >((res) => {
+      resolveData = res;
+    });
+
+    peer1.on("error", onError);
+    peer2.on("error", onError);
+
+    peer2.on("fileStream", async (metadata, stream) => {
+      const reader = stream.getReader();
+      const chunks: Uint8Array[] = [];
+      let done = false;
+      while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        if (value) chunks.push(value);
+        done = streamDone;
+      }
+      // Concatenate all chunks into a single Uint8Array
+      const totalLength = chunks.reduce((acc, curr) => acc + curr.length, 0);
+      const result = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolveData([metadata, result]);
+    });
+
+    peer1.sendFile(file);
+
+    const [recvMetadata, recvData] = await dataProm;
+    expect(recvData).toEqual(buffer);
+    expect(recvMetadata.name).toBe(file.name);
+    expect(recvMetadata.size).toBe(file.size);
+    expect(recvMetadata.type).toBe(file.type);
+    expect(recvMetadata.lastModified).toBe(file.lastModified);
+
+    expect(onError).not.toHaveBeenCalled();
+
+    await close(peer1, peer2, m1, m2);
+  });
+
   it("Cleans up properly when closed", async () => {
     const [peer1, peer2, manager1, manager2] = await createPeers<Events>();
 

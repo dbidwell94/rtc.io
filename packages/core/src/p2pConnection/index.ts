@@ -79,6 +79,8 @@ function metadataIsForFile(metadata: unknown): metadata is FileMetadata {
   return "_internalIsFile" in metadata;
 }
 
+const MAX_CHUNK_SIZE = 8 * 1024; // 8 KB
+
 export class P2PConnection<
   ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>
 > {
@@ -113,12 +115,20 @@ export class P2PConnection<
     peerId,
     onClose,
     dataTimeout = 5_000, // 5 seconds
-    maxChunkSize = 1024, // 1KB
+    maxChunkSize = MAX_CHUNK_SIZE,
   }: P2POptions) {
     this._connection = connection;
     this._peerId = peerId;
     this._data = genericDataChannel;
     this._binaryData = binaryDataChannel;
+
+    if (maxChunkSize > MAX_CHUNK_SIZE) {
+      maxChunkSize = MAX_CHUNK_SIZE;
+      console.warn(
+        `maxChunkSize cannot be larger than ${MAX_CHUNK_SIZE} bytes. Setting to ${MAX_CHUNK_SIZE} bytes.`
+      );
+    }
+
     this._chunker = new BinaryChunker({
       onDataTimeout: this.onDataTimedOut,
       dataTimeout,
@@ -127,8 +137,8 @@ export class P2PConnection<
     this._data.binaryType = "arraybuffer";
     this._binaryData.binaryType = "arraybuffer";
 
-    this._data.bufferedAmountLowThreshold = 1024 * 64; // 64 KB
-    this._binaryData.bufferedAmountLowThreshold = 1024 * 64; // 64 KB
+    this._data.bufferedAmountLowThreshold = 1024 * 128; // 128 KB
+    this._binaryData.bufferedAmountLowThreshold = 1024 * 128; // 128 KB
 
     this._onCloseManagerCallback = onClose;
 
@@ -379,9 +389,7 @@ export class P2PConnection<
     data: ArrayBuffer,
     metadata?: T
   ): Promise<Result<void>> {
-    const chunks = this._chunker.chunkData(data, metadata);
-
-    for (const chunk of chunks) {
+    for (const chunk of this._chunker.chunkData(data, metadata)) {
       const waitRes = await this.waitForBinaryBuffer();
 
       if (waitRes.isError()) {
@@ -391,6 +399,7 @@ export class P2PConnection<
       try {
         this._binaryData.send(chunk);
       } catch (err) {
+        this.callHandlers("error", err as Error);
         return result.err(err as Error);
       }
     }
