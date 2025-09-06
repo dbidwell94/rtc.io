@@ -40,7 +40,7 @@ export interface RemoteOffer {
 }
 
 export interface InternalEvents<
-  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
+  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>
 > {
   /**
    * A new peer has connected. Any event listeners specific to the
@@ -151,7 +151,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
           });
         });
       },
-      this._lifecycleCleanupAbortController.signal,
+      this._lifecycleCleanupAbortController.signal
     );
   }
 
@@ -179,7 +179,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   public on<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
     handler: InternalEvents<ClientToPeerEvent>[TKey],
-    abortSignal?: AbortSignal,
+    abortSignal?: AbortSignal
   ) {
     if (abortSignal) {
       const cleanup = () => {
@@ -205,7 +205,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    */
   public off<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
-    handler: InternalEvents<ClientToPeerEvent>[TKey],
+    handler: InternalEvents<ClientToPeerEvent>[TKey]
   ) {
     this._events[event]?.delete(handler);
   }
@@ -225,7 +225,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    */
   public async connectToRoom(): Promise<Result<PeerId>> {
     const myPeerIdRes = await this._signalingInterface.connectToRoom(
-      this._roomName,
+      this._roomName
     );
 
     if (myPeerIdRes.isError()) {
@@ -298,33 +298,40 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
      */
     const sendOff = (
       dataChannel: RTCDataChannel,
-      binaryDataChannel: RTCDataChannel,
+      binaryDataChannel: RTCDataChannel
     ) => {
+      // If we already have a connection to this peer, then we should
+      // not do anything
+      if (this._connectedPeers.has(peerId)) {
+        return;
+      }
+
       dataChannel.onopen = null;
+
+      const clientConnection = new P2PConnection<ClientToPeerEvent>({
+        binaryDataChannel,
+        connection,
+        genericDataChannel: dataChannel,
+        peerId,
+        dataTimeout: this._dataTimeoutMs.unsafeUnwrap() as number | undefined,
+        maxChunkSize: this._maxChunkSizeBytes.unsafeUnwrap() as
+          | number
+          | undefined,
+        onClose: () => {
+          this._connectedPeers.delete(peerId);
+          // Failsafe just to make sure we cleanup any and all data from the P2PConnection
+          this._pendingPeers.delete(peerId);
+          // Removes any event listeners assigned to this abort signal
+          globalStateCleanupAbort.abort();
+        },
+      });
+
+      // We're handing off control to the P2PConnection. Cleanup any temp listeners
+      tempStateCleanupAbort.abort();
+      this._pendingPeers.delete(peerId);
+      this._connectedPeers.set(peerId, clientConnection);
+
       this._events["connected"]?.forEach((callback) => {
-        const clientConnection = new P2PConnection<ClientToPeerEvent>({
-          binaryDataChannel,
-          connection,
-          genericDataChannel: dataChannel,
-          peerId,
-          dataTimeout: this._dataTimeoutMs.unsafeUnwrap() as number | undefined,
-          maxChunkSize: this._maxChunkSizeBytes.unsafeUnwrap() as
-            | number
-            | undefined,
-          onClose: () => {
-            this._connectedPeers.delete(peerId);
-            // Failsafe just to make sure we cleanup any and all data from the P2PConnection
-            this._pendingPeers.delete(peerId);
-
-            // Removes any event listeners assigned to this abort signal
-            globalStateCleanupAbort.abort();
-          },
-        });
-
-        // We're handing off control to the P2PConnection. Cleanup any temp listeners
-        tempStateCleanupAbort.abort();
-        this._pendingPeers.delete(peerId);
-        this._connectedPeers.set(peerId, clientConnection);
         callback(clientConnection);
       });
     };
@@ -363,7 +370,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         }
         case "failed": {
           this._events["connectionFailed"]?.forEach((callback) =>
-            callback(peerId),
+            callback(peerId)
           );
           break;
         }
@@ -376,7 +383,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
   private async acceptOffer(
     peerId: PeerId,
-    offer: RTCSessionDescriptionInit,
+    offer: RTCSessionDescriptionInit
   ): Promise<Result<void>> {
     if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {
       return result.err("Unable to accept offer on a pre-existing connection");
@@ -418,19 +425,19 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
             // this is a hack to send a class over the wire.
             // Might just need this for the LocalSignaler, but
             // doing this just to be safe.
-            JSON.parse(JSON.stringify(candidateOpt.value)),
+            JSON.parse(JSON.stringify(candidateOpt.value))
           );
         }
       },
       {
         signal: peerState.globalStateCleanupAbort.signal,
-      },
+      }
     );
 
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
-      peerState.globalStateCleanupAbort.signal,
+      peerState.globalStateCleanupAbort.signal
     );
 
     connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);
@@ -471,14 +478,14 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       "answer",
       this.onAnswer(peerId, connection),
       // cleanup should be done after we establish connection.
-      tempStateCleanupAbort.signal,
+      tempStateCleanupAbort.signal
     );
 
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
       // cleanup should be done when the connection closes.
-      globalStateCleanupAbort.signal,
+      globalStateCleanupAbort.signal
     );
 
     connection.addEventListener(
@@ -493,12 +500,12 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         this._signalingInterface.sendIceCandidate(
           peerId,
           // Same hack as above. Just to be safe.
-          JSON.parse(JSON.stringify(candidateOpt.value)),
+          JSON.parse(JSON.stringify(candidateOpt.value))
         );
       },
       {
         signal: globalStateCleanupAbort.signal,
-      },
+      }
     );
 
     connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);

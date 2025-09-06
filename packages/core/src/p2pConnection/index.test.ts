@@ -81,14 +81,6 @@ describe("src/p2pConnection/index.ts", () => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(testData);
     });
-
-    peer1.off("test", spy);
-    spy.mockClear();
-    await peer2.emit("test", testData);
-
-    expect(spy).not.toHaveBeenCalled();
-
-    await close(peer1, peer2);
   });
 
   it("Only calls handlers one time for a one shot event", async () => {

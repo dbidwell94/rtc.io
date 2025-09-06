@@ -154,7 +154,6 @@ export class P2PConnection<
       const connection = evt.target as RTCPeerConnection;
       switch (connection.connectionState) {
         case "closed": {
-          console.log("Calling close handler from the P2P Connection");
           await this.close();
           break;
         }
