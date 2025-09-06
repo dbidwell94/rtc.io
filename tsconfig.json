@@ -13,7 +13,8 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "removeComments": true,
-    "rootDir": "."
+    "rootDir": ".",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"]
   },
   "files": [],
   "exclude": ["./jest.setup.js"],

@@ -9,7 +9,7 @@ let signal2: LocalSignal;
 let peer1Id: PeerId;
 let peer2Id: PeerId;
 
-const ROOM_NAME = "ROOM";
+let ROOM_NAME: string;
 
 async function closePeers(...peers: RTC<never>[]) {
   await Promise.all(peers.map(async (peer) => await peer.close()));
@@ -22,15 +22,17 @@ describe("src/manager.ts", () => {
 
     peer1Id = (await signal1.connectToRoom()).unwrap();
     peer2Id = (await signal2.connectToRoom()).unwrap();
+
+    ROOM_NAME = crypto.randomUUID();
   });
 
   it("Connects 2 peers together", async () => {
     const firstConnected = jest.fn();
     const secondConnected = jest.fn();
-    const p2p1 = new RTC(signal1, ROOM_NAME);
+    const p2p1 = new RTC({ signaler: signal1, roomName: ROOM_NAME });
     p2p1.on("connected", firstConnected);
 
-    const p2p2 = new RTC(signal2, ROOM_NAME);
+    const p2p2 = new RTC({ signaler: signal2, roomName: ROOM_NAME });
     p2p2.on("connected", secondConnected);
     p2p2.on("connectionRequest", async (req) => {
       if (req.remoteId == peer1Id) {
@@ -59,12 +61,18 @@ describe("src/manager.ts", () => {
 
     const onP2p1Message = jest.fn();
 
-    const p2p1 = new RTC<TestInterface>(signal1, ROOM_NAME);
+    const p2p1 = new RTC<TestInterface>({
+      signaler: signal1,
+      roomName: ROOM_NAME,
+    });
     p2p1.on("connected", (p2p) => {
       p2p.on("message", onP2p1Message);
     });
 
-    const p2p2 = new RTC<TestInterface>(signal2, ROOM_NAME);
+    const p2p2 = new RTC<TestInterface>({
+      signaler: signal2,
+      roomName: ROOM_NAME,
+    });
     p2p2.on("connected", async (p2p) => {
       await p2p.emit("message", testMessage);
     });

@@ -45,11 +45,13 @@ export interface ClientSignaler {
   getRoomPeers: () => Array<PeerId>;
 
   /**
-   * These are specific events that the RTC manager will subscribe to.
+   * These are specific events that the RTC manager will subscribe to. If an abort signal
+   * is also sent, then when the signal is aborted the subscription will be removed
    */
   on: <E extends keyof SignalerEvents>(
     event: E,
     listener: SignalerEvents[E],
+    abortSignal?: AbortSignal,
   ) => void;
   /**
    * If the caller calls this, the handler should be removed and no longer be able to be called.

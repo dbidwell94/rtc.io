@@ -1,7 +1,7 @@
 import waitFor from "wait-for-expect";
 import LocalSignalServer from "@rtcio/signal-local";
 import { P2PConnection, VoidMethods } from ".";
-import { RTC } from "../manager";
+import { RTC, RtcOptions } from "../manager";
 import { JsonObject } from "./binaryData";
 import { Option } from "@dbidwell94/ts-utils";
 
@@ -9,16 +9,30 @@ interface Events {
   test: (arg1: string) => void;
 }
 
-async function createPeers<T extends VoidMethods<T>>(): Promise<
-  [P2PConnection<T>, P2PConnection<T>]
-> {
-  const manager1 = new RTC<T>(new LocalSignalServer("TEST"), "TEST");
+async function createPeers<T extends VoidMethods<T>>(
+  options?: Partial<Omit<RtcOptions, "signaler" | "roomName">>,
+): Promise<[P2PConnection<T>, P2PConnection<T>, RTC<T>, RTC<T>]> {
+  const opts: Omit<RtcOptions, "signaler"> = {
+    roomName: crypto.randomUUID(),
+    dataTimeoutMs: options?.dataTimeoutMs,
+    iceServers: options?.iceServers,
+    maxChunkSizeBytes: options?.maxChunkSizeBytes,
+  };
+
+  const manager1 = new RTC<T>({
+    ...opts,
+    signaler: new LocalSignalServer(opts.roomName),
+  });
 
   const peer1Promise = new Promise<P2PConnection<T>>((res) => {
     manager1.on("connected", (peer) => res(peer));
   });
 
-  const manager2 = new RTC<T>(new LocalSignalServer("TEST"), "TEST");
+  const manager2 = new RTC<T>({
+    ...opts,
+    signaler: new LocalSignalServer(opts.roomName),
+  });
+
   const manager2Id = (await manager2.connectToRoom()).unwrap();
 
   const peer2Promise = new Promise<P2PConnection<T>>((res) => {
@@ -31,7 +45,7 @@ async function createPeers<T extends VoidMethods<T>>(): Promise<
   const peer1 = await peer1Promise;
   const peer2 = await peer2Promise;
 
-  return [peer1, peer2];
+  return [peer1, peer2, manager1, manager2];
 }
 
 async function close(...peers: P2PConnection<never>[]) {
@@ -67,14 +81,6 @@ describe("src/p2pConnection/index.ts", () => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(testData);
     });
-
-    peer1.off("test", spy);
-    spy.mockClear();
-    await peer2.emit("test", testData);
-
-    expect(spy).not.toHaveBeenCalled();
-
-    await close(peer1, peer2);
   });
 
   it("Only calls handlers one time for a one shot event", async () => {
@@ -95,6 +101,22 @@ describe("src/p2pConnection/index.ts", () => {
     await close(peer1, peer2);
   });
 
+  it("Only calls handlers one time if an event is fired once", async () => {
+    const testData = "TEST";
+    const [peer1, peer2] = await createPeers<Events>();
+
+    const spy = jest.fn();
+    peer1.on("test", spy);
+
+    peer2.emit("test", testData);
+
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    await close(peer1, peer2);
+  });
+
   it("Reconstructs binary data with metadata as a data event", async () => {
     interface Metadata extends JsonObject {
       name: string;
@@ -107,7 +129,7 @@ describe("src/p2pConnection/index.ts", () => {
     const [peer1, peer2] = await createPeers<Events>();
 
     const dataProm = new Promise<[Option<unknown>, ArrayBuffer]>((res) =>
-      peer2.on("data", (meta, data) => res([meta, data])),
+      peer2.on("data", (meta, data) => res([meta as Option<unknown>, data])),
     );
 
     peer1.sendRaw<Metadata>(data.buffer, metadata);
@@ -118,5 +140,33 @@ describe("src/p2pConnection/index.ts", () => {
     expect(recvMetadata.unsafeUnwrap()).toEqual(metadata);
 
     await close(peer1, peer2);
+  });
+
+  it("Sends a closed event to a connected peer when one peer closes the connection", async () => {
+    const [peer1, peer2, manager1, manager2] = await createPeers();
+
+    const onClose = jest.fn();
+    const onError = jest.fn();
+
+    peer1.on("connectionClosed", onClose);
+    peer2.on("connectionClosed", onClose);
+
+    peer1.on("error", onError);
+    peer2.on("error", onError);
+
+    await peer2.close();
+
+    await waitFor(() => {
+      expect(manager1["_connectedPeers"].size).toEqual(0);
+      expect(manager1["_pendingPeers"].size).toEqual(0);
+      expect(manager2["_connectedPeers"].size).toEqual(0);
+      expect(manager2["_pendingPeers"].size).toEqual(0);
+    });
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    expect(onError).not.toHaveBeenCalled();
   });
 });

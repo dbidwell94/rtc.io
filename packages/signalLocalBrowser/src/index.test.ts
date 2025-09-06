@@ -10,8 +10,9 @@ let peer2Id: PeerId;
 
 describe("src/index.ts", () => {
   beforeEach(async () => {
-    peer1 = new LocalSignalServer();
-    peer2 = new LocalSignalServer();
+    const channelName = crypto.randomUUID();
+    peer1 = new LocalSignalServer(channelName);
+    peer2 = new LocalSignalServer(channelName);
 
     peer1Id = (await peer1.connectToRoom()).unwrap();
     peer2Id = (await peer2.connectToRoom()).unwrap();
