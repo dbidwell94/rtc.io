@@ -1,11 +1,7 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-
 const wrtc = require("@roamhq/wrtc");
 const util = require("util");
 const stream = require("node:stream/web");
-const blob = require("fetch-blob/from.js");
-
-console.log(blob);
+const blob = require('buffer');
 
 Object.defineProperties(globalThis, {
   TextEncoder: { value: util.TextEncoder },
@@ -15,5 +11,7 @@ Object.defineProperties(globalThis, {
   RTCSessionDescription: { value: wrtc.RTCSessionDescription },
   RTCIceCandidate: { value: wrtc.RTCIceCandidate },
   ReadableStream: { value: stream.ReadableStream },
-  File: { value: blob.File },
+  Blob: { value: blob.Blob },
+  File: {value: blob.File}
 });
+

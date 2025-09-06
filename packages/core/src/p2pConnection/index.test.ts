@@ -196,8 +196,6 @@ describe("src/p2pConnection/index.ts", () => {
     };
     const file = new File([fileData], "test.txt", fileOpts);
 
-    console.log(file.arrayBuffer);
-
     const [peer1, peer2, m1, m2] = await createPeers();
 
     const dataProm = new Promise<[Parameters<InternalEvents["file"]>[0], Blob]>(

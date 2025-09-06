@@ -40,7 +40,7 @@ export default {
   transform: {
     ...tsJestTransformCfg,
   },
-  setupFilesAfterEnv: ["./jest.setup.js"],
+  setupFilesAfterEnv: ["./jest.setup.cjs"],
   moduleNameMapper,
   collectCoverageFrom: [
     "<rootDir>/packages/*/src/**/*.ts",
