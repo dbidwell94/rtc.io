@@ -27,17 +27,17 @@ export interface InternalEvents {
 
   data: <T extends JsonValue>(
     metadata: Option<T>,
-    binaryData: ArrayBuffer,
+    binaryData: ArrayBuffer
   ) => MaybePromise<void>;
 
   file: (
     metadata: Omit<FileMetadata, "_internalIsFile">,
-    binaryData: Blob,
+    binaryData: Blob
   ) => MaybePromise<void>;
 
   fileStream: (
     metadata: Omit<FileMetadata, "_internalIsFile">,
-    binaryData: ReadableStream<Uint8Array>,
+    binaryData: ReadableStream<Uint8Array>
   ) => MaybePromise<void>;
 
   dataTimedOut: (dataId: string) => MaybePromise<void>;
@@ -49,8 +49,8 @@ export type VoidMethods<T> = {
   [K in keyof T as K extends keyof InternalEvents
     ? never
     : T[K] extends (...args: unknown[]) => MaybePromise<void>
-      ? K
-      : never]: T[K];
+    ? K
+    : never]: T[K];
 };
 
 export type EventMap<T> = T & InternalEvents;
@@ -80,13 +80,16 @@ function metadataIsForFile(metadata: unknown): metadata is FileMetadata {
 }
 
 export class P2PConnection<
-  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
+  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>
 > {
   private _events: {
     [K in keyof EventMap<ClientToPeerEvents>]?: Set<
       EventMap<ClientToPeerEvents>[K]
     >;
   } = Object.create(null);
+
+  private _eventAbortSignals: Map<(...args: unknown[]) => void, AbortSignal> =
+    new Map();
 
   private _oneShotEvents: {
     [K in keyof EventMap<ClientToPeerEvents>]?: Set<
@@ -135,14 +138,14 @@ export class P2PConnection<
         return;
       }
       await this.emitError(
-        new Error("Unknown data received from binary RTCDataChannel"),
+        new Error("Unknown data received from binary RTCDataChannel")
       );
     };
 
     this._data.onmessage = async ({ data }) => {
       if (typeof data !== "string") {
         await this.emitError(
-          new Error("Unknown data received from generic RTCDataChannel"),
+          new Error("Unknown data received from generic RTCDataChannel")
         );
         return;
       }
@@ -243,7 +246,7 @@ export class P2PConnection<
 
     const listeners: Array<EventMap<ClientToPeerEvents>["fileStream"]> =
       Array.from(this._events["fileStream"] ?? []).concat(
-        Array.from(this._oneShotEvents["fileStream"] ?? []),
+        Array.from(this._oneShotEvents["fileStream"] ?? [])
       );
 
     if (listeners.length === 1) {
@@ -307,17 +310,17 @@ export class P2PConnection<
           const waitTimeout = setTimeout(() => {
             this._binaryData.removeEventListener(
               "bufferedamountlow",
-              onBufferAmountLow,
+              onBufferAmountLow
             );
             rej(
-              "Timeout of 500ms exceeded waiting for space in the binary data buffer",
+              "Timeout of 500ms exceeded waiting for space in the binary data buffer"
             );
           }, 500);
 
           const onBufferAmountLow = () => {
             this._binaryData.removeEventListener(
               "bufferedamountlow",
-              onBufferAmountLow,
+              onBufferAmountLow
             );
             clearTimeout(waitTimeout);
             res();
@@ -325,9 +328,9 @@ export class P2PConnection<
 
           this._binaryData.addEventListener(
             "bufferedamountlow",
-            onBufferAmountLow,
+            onBufferAmountLow
           );
-        }),
+        })
       );
 
       if (res.isError()) {
@@ -345,24 +348,24 @@ export class P2PConnection<
           const waitTimeout = setTimeout(() => {
             this._data.removeEventListener(
               "bufferedamountlow",
-              onBufferAmountLow,
+              onBufferAmountLow
             );
             rej(
-              "Timeout of 500ms exceeded waiting for buffer space for message",
+              "Timeout of 500ms exceeded waiting for buffer space for message"
             );
           }, 500);
 
           const onBufferAmountLow = () => {
             this._data.removeEventListener(
               "bufferedamountlow",
-              onBufferAmountLow,
+              onBufferAmountLow
             );
             clearTimeout(waitTimeout);
             res();
           };
 
           this._data.addEventListener("bufferedamountlow", onBufferAmountLow);
-        }),
+        })
       );
 
       if (res.isError()) {
@@ -374,7 +377,7 @@ export class P2PConnection<
 
   async sendRaw<T extends JsonValue>(
     data: ArrayBuffer,
-    metadata?: T,
+    metadata?: T
   ): Promise<Result<void>> {
     const chunks = this._chunker.chunkData(data, metadata);
 
@@ -455,15 +458,15 @@ export class P2PConnection<
 
   once<TKey extends keyof InternalEvents>(
     event: TKey,
-    callback: InternalEvents[TKey],
+    callback: InternalEvents[TKey]
   ): void;
   once<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
-    callback: ClientToPeerEvents[TKey],
+    callback: ClientToPeerEvents[TKey]
   ): void;
   once<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
-    callback: EventMap<ClientToPeerEvents>[TKey],
+    callback: EventMap<ClientToPeerEvents>[TKey]
   ) {
     if (this._oneShotEvents[event]) {
       this._oneShotEvents[event].add(callback);
@@ -475,15 +478,29 @@ export class P2PConnection<
   on<TKey extends keyof InternalEvents>(
     event: TKey,
     callback: InternalEvents[TKey],
+    abortSignal?: AbortSignal
   ): void;
   on<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     callback: ClientToPeerEvents[TKey],
+    abortSignal?: AbortSignal
   ): void;
   on<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
+    abortSignal?: AbortSignal
   ) {
+    if (abortSignal) {
+      const cleanup = () => {
+        this._events[event]?.delete(handler);
+        abortSignal.onabort = null;
+        this._eventAbortSignals.delete(handler);
+      };
+
+      abortSignal.onabort = cleanup;
+      this._eventAbortSignals.set(handler, abortSignal);
+    }
+
     if (this._events[event]) {
       this._events[event].add(handler);
     } else {
@@ -493,16 +510,22 @@ export class P2PConnection<
 
   off<TKey extends keyof InternalEvents>(
     event: TKey,
-    callback: InternalEvents[TKey],
+    callback: InternalEvents[TKey]
   ): void;
   off<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
-    callback: ClientToPeerEvents[TKey],
+    callback: ClientToPeerEvents[TKey]
   ): void;
   off<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
-    handler: EventMap<ClientToPeerEvents>[TKey],
+    handler: EventMap<ClientToPeerEvents>[TKey]
   ) {
+    if (this._eventAbortSignals.has(handler)) {
+      // Remove the abort event listener and delete the
+      // abort signal from the internal memory
+      this._eventAbortSignals.get(handler)!.onabort = null;
+      this._eventAbortSignals.delete(handler);
+    }
     if (this._events[event]?.has(handler)) {
       this._events[event].delete(handler);
     }
@@ -514,33 +537,60 @@ export class P2PConnection<
         res();
         return;
       }
-      this._data.onclose = () => res();
+      this._data.addEventListener("close", () => res(), { once: true });
     });
     const closeBinaryData = new Promise<void>((res) => {
       if (this._binaryData.readyState === "closed") {
         res();
         return;
       }
-      this._binaryData.onclose = () => res();
+      this._binaryData.addEventListener("close", () => res(), { once: true });
     });
     const closeConn = new Promise<void>((res) => {
       if (this._connection.connectionState === "closed") {
         res();
         return;
       }
-      this._connection.onconnectionstatechange = async (evt) => {
-        const connection = evt.target as RTCPeerConnection;
-        if (connection.connectionState === "closed") {
-          await this.onClosed();
-          res();
-        }
-      };
+
+      this._connection.addEventListener(
+        "connectionstatechange",
+        async () => {
+          if (this._connection.connectionState === "closed") {
+            await this.onClosed();
+            res();
+          }
+        },
+        { once: true }
+      );
     });
 
     await this.sendClosed();
     this._data.close();
     this._binaryData.close();
     this._connection.close();
+
     await Promise.all([closeData, closeBinaryData, closeConn]);
+
+    // cleanup all the internal maps
+    this._eventAbortSignals.forEach((signal) => {
+      signal.onabort = null;
+    });
+    this._eventAbortSignals.clear();
+
+    // Drain every Set in the events map and delete the subsequent event key
+    Object.entries(this._events).forEach(([key, value]) => {
+      (value as Set<unknown>).clear();
+      delete this._events[key as keyof typeof this._events];
+    });
+
+    // Drain every Set in the oneShotEvents map and delete the subsequent event key
+    Object.entries(this._oneShotEvents).forEach(([key, value]) => {
+      (value as Set<unknown>).clear();
+      delete this._oneShotEvents[key as keyof typeof this._oneShotEvents];
+    });
+
+    this._connection.onconnectionstatechange = null;
+    this._binaryData.onclose = null;
+    this._data.onclose = null;
   }
 }

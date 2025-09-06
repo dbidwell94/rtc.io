@@ -1,6 +1,6 @@
 import waitFor from "wait-for-expect";
 import LocalSignalServer from "@rtcio/signal-local";
-import { P2PConnection, VoidMethods } from ".";
+import { InternalEvents, P2PConnection, VoidMethods } from ".";
 import { RTC, RtcOptions } from "../manager";
 import { JsonObject } from "./binaryData";
 import { Option } from "@dbidwell94/ts-utils";
@@ -10,7 +10,7 @@ interface Events {
 }
 
 async function createPeers<T extends VoidMethods<T>>(
-  options?: Partial<Omit<RtcOptions, "signaler" | "roomName">>,
+  options?: Partial<Omit<RtcOptions, "signaler" | "roomName">>
 ): Promise<[P2PConnection<T>, P2PConnection<T>, RTC<T>, RTC<T>]> {
   const opts: Omit<RtcOptions, "signaler"> = {
     roomName: crypto.randomUUID(),
@@ -48,73 +48,89 @@ async function createPeers<T extends VoidMethods<T>>(
   return [peer1, peer2, manager1, manager2];
 }
 
-async function close(...peers: P2PConnection<never>[]) {
+async function close(...peers: { close: () => Promise<void> }[]) {
   await Promise.all(peers.map((peer) => peer.close()));
 }
 
 describe("src/p2pConnection/index.ts", () => {
   it("Sends custom events", async () => {
     const eventItem = "TEST";
-    const [peer1, peer2] = await createPeers<Events>();
+    const [peer1, peer2, m1, m2] = await createPeers<Events>();
 
     const receivedEvent = new Promise<string>((res) =>
-      peer2.on("test", (data) => res(data)),
+      peer2.on("test", (data) => res(data))
     );
 
     await peer1.emit("test", eventItem);
 
     expect(await receivedEvent).toEqual(eventItem);
 
-    await close(peer1, peer2);
+    await close(peer1, peer2, m1, m2);
   });
 
   it("Unsubscribes from events", async () => {
     const testData = "TEST";
     const spy = jest.fn();
 
-    const [peer1, peer2] = await createPeers<Events>();
+    const [peer1, peer2, m1, m2] = await createPeers<Events>();
 
     peer1.on("test", spy);
-    await peer2.emit("test", testData);
+    expect((await peer2.emit("test", testData)).isOk()).toBe(true);
 
     await waitFor(() => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(testData);
     });
+
+    const stringRecvSpy = jest.spyOn(peer1, "callHandlers" as any);
+
+    peer1.off("test", spy);
+
+    expect((await peer2.emit("test", testData)).isOk()).toBe(true);
+
+    await waitFor(() => {
+      expect(stringRecvSpy).toHaveBeenCalledTimes(1);
+    });
+
+    spy.mockClear();
+
+    expect(spy).toHaveBeenCalledTimes(0);
+
+    await close(peer1, peer2, m1, m2);
   });
 
   it("Only calls handlers one time for a one shot event", async () => {
     const testData = "TEST";
-    const [peer1, peer2] = await createPeers<Events>();
+    const [peer1, peer2, m1, m2] = await createPeers<Events>();
 
     const spy = jest.fn();
     peer1.once("test", spy);
 
     for (let i = 0; i < 10; i++) {
-      await peer2.emit("test", testData);
+      expect((await peer2.emit("test", testData)).isOk()).toBe(true);
     }
 
     await waitFor(() => {
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
-    await close(peer1, peer2);
+    await close(peer1, peer2, m1, m2);
   });
 
   it("Only calls handlers one time if an event is fired once", async () => {
     const testData = "TEST";
-    const [peer1, peer2] = await createPeers<Events>();
+    const [peer1, peer2, m1, m2] = await createPeers<Events>();
 
     const spy = jest.fn();
     peer1.on("test", spy);
 
-    peer2.emit("test", testData);
+    expect((await peer2.emit("test", testData)).isOk()).toBe(true);
 
     await waitFor(() => {
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
-    await close(peer1, peer2);
+    await close(peer1, peer2, m1, m2);
   });
 
   it("Reconstructs binary data with metadata as a data event", async () => {
@@ -126,10 +142,10 @@ describe("src/p2pConnection/index.ts", () => {
     };
     const data = new Uint8Array([1, 2, 3, 4, 5]);
 
-    const [peer1, peer2] = await createPeers<Events>();
+    const [peer1, peer2, m1, m2] = await createPeers<Events>();
 
     const dataProm = new Promise<[Option<unknown>, ArrayBuffer]>((res) =>
-      peer2.on("data", (meta, data) => res([meta as Option<unknown>, data])),
+      peer2.on("data", (meta, data) => res([meta as Option<unknown>, data]))
     );
 
     peer1.sendRaw<Metadata>(data.buffer, metadata);
@@ -139,7 +155,7 @@ describe("src/p2pConnection/index.ts", () => {
     expect(recvData).toEqual(data.buffer);
     expect(recvMetadata.unsafeUnwrap()).toEqual(metadata);
 
-    await close(peer1, peer2);
+    await close(peer1, peer2, m1, m2);
   });
 
   it("Sends a closed event to a connected peer when one peer closes the connection", async () => {
@@ -168,5 +184,95 @@ describe("src/p2pConnection/index.ts", () => {
     });
 
     expect(onError).not.toHaveBeenCalled();
+
+    await close(peer1, peer2, manager1, manager2);
+  });
+
+  it("Sends file data as raw data", async () => {
+    const fileData = new Uint8Array([1, 2, 3, 4, 5]);
+    const fileOpts: FilePropertyBag = {
+      type: "text/plain",
+      lastModified: Date.now(),
+    };
+    const file = new File([fileData], "test.txt", fileOpts);
+
+    console.log(file.arrayBuffer);
+
+    const [peer1, peer2, m1, m2] = await createPeers();
+
+    const dataProm = new Promise<[Parameters<InternalEvents["file"]>[0], Blob]>(
+      (res) => peer2.on("file", (metadata, file) => res([metadata, file]))
+    );
+    expect((await peer1.sendFile(file)).isOk()).toBe(true);
+
+    const [recvMetadata, recvFile] = await dataProm;
+
+    expect(recvMetadata.name).toBe(file.name);
+    expect(recvMetadata.size).toBe(file.size);
+    expect(recvMetadata.type).toBe(file.type);
+    expect(recvMetadata.lastModified).toBe(file.lastModified);
+
+    const recvFileData = new Uint8Array(await recvFile.arrayBuffer());
+    expect(recvFileData).toEqual(fileData);
+
+    await close(peer1, peer2, m1, m2);
+  });
+
+  it("Cleans up properly when closed", async () => {
+    const [peer1, peer2, manager1, manager2] = await createPeers<Events>();
+
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
+    const onClose1 = jest.fn();
+    const onClose2 = jest.fn();
+    const onError1 = jest.fn();
+    const onError2 = jest.fn();
+
+    peer1.on("connectionClosed", onClose1);
+    peer2.on("connectionClosed", onClose2);
+
+    peer1.on("error", onError1);
+    peer2.on("error", onError2);
+
+    peer1.on("test", () => {}, signal);
+    peer2.on("test", () => {}, signal);
+
+    await peer1.close();
+    await peer2.close();
+
+    await waitFor(() => {
+      expect(manager1["_connectedPeers"].size).toEqual(0);
+      expect(manager1["_pendingPeers"].size).toEqual(0);
+      expect(manager2["_connectedPeers"].size).toEqual(0);
+      expect(manager2["_pendingPeers"].size).toEqual(0);
+    });
+
+    await waitFor(() => {
+      expect(onClose1).toHaveBeenCalledTimes(1);
+      expect(onClose2).toHaveBeenCalledTimes(1);
+      expect(peer1["_eventAbortSignals"].size).toBe(0);
+      expect(peer2["_eventAbortSignals"].size).toBe(0);
+      expect(signal["onabort"]).toBeNull();
+
+      expect(Object.keys(peer1["_events"])).toHaveLength(0);
+      expect(Object.keys(peer2["_events"])).toHaveLength(0);
+
+      expect(Object.keys(peer1["_oneShotEvents"])).toHaveLength(0);
+      expect(Object.keys(peer2["_oneShotEvents"])).toHaveLength(0);
+    });
+
+    expect(onError1).not.toHaveBeenCalled();
+    expect(onError2).not.toHaveBeenCalled();
+
+    expect(peer1["_connection"].connectionState).toBe("closed");
+    expect(peer1["_data"].readyState).toBe("closed");
+    expect(peer1["_binaryData"].readyState).toBe("closed");
+
+    expect(peer2["_connection"].connectionState).toBe("closed");
+    expect(peer2["_data"].readyState).toBe("closed");
+    expect(peer2["_binaryData"].readyState).toBe("closed");
+
+    await close(manager1, manager2);
   });
 });
