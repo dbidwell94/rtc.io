@@ -127,6 +127,76 @@ export class BinaryChunker {
     }
   }
 
+  async *streamData<T extends JsonValue = null>(
+    dataStream: ReadableStream<Uint8Array>,
+    metadata?: T,
+  ): AsyncGenerator<ArrayBuffer> {
+    const dataId = crypto.randomUUID();
+    const dataIdBytes = this.uuidToBytes(dataId);
+
+    yield this.buildMetadata(metadata ?? null, dataIdBytes);
+
+    // start at 1, 0 is the metadata
+    let chunkIndex = 1;
+
+    const buffer = new Uint8Array(this._maxChunkSize);
+    let bufferCursor = HEADER_BYTE_SIZE;
+
+    const reader = dataStream.getReader();
+    try {
+      let readDone = false;
+      while (!readDone) {
+        const { done, value } = await reader.read();
+        if (done || !value || value.byteLength < 1) {
+          readDone = true;
+          break;
+        }
+
+        // represents where in the current {value} we are.
+        let valueCursor = 0;
+
+        while (valueCursor < value.byteLength - 1) {
+          const spaceInBuffer = this._maxChunkSize - bufferCursor;
+          const dataLeftInBytes = value.byteLength - valueCursor;
+          const bytesToCopy = Math.min(spaceInBuffer, dataLeftInBytes);
+
+          const valueSlice = value.subarray(
+            valueCursor,
+            valueCursor + bytesToCopy,
+          );
+          buffer.set(valueSlice, bufferCursor);
+
+          valueCursor += bytesToCopy;
+          bufferCursor += bytesToCopy;
+
+          if (bufferCursor === this._maxChunkSize) {
+            // Have to create a copy, otherwise will be overwriting the buffer before
+            // it has been sent.
+            yield this.buildHeader(
+              dataIdBytes,
+              chunkIndex,
+              readDone && dataLeftInBytes === 0,
+              buffer.buffer,
+            ).slice(0);
+            chunkIndex += 1;
+            bufferCursor = HEADER_BYTE_SIZE;
+          }
+        }
+      }
+
+      // edge case, we didn't have a full buffer in the while loop and we still have data
+      // to send in the buffer
+      if (bufferCursor !== HEADER_BYTE_SIZE) {
+        // we don't need to take the ArrayBuffer, it has been written into the
+        // buffer variable
+        this.buildHeader(dataIdBytes, chunkIndex, true, buffer.buffer);
+        yield buffer.slice(0, bufferCursor).buffer;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
   setDataIsStream(dataId: string): Result<ReadableStream<Uint8Array>> {
     const timeoutHandler = () => {
       const optData = option.unknown(this._streams.get(dataId));
@@ -322,12 +392,16 @@ export class BinaryChunker {
     }
   }
 
+  /**
+   * This will either return a new ArrayBuffer, or will modify the incoming
+   * header param to put the header at the start of the buffer
+   */
   private buildHeader(
     fileId: Uint8Array,
     chunkIndex: number,
     isLast: boolean,
+    header: ArrayBuffer = new ArrayBuffer(HEADER_BYTE_SIZE),
   ): ArrayBuffer {
-    const header = new ArrayBuffer(HEADER_BYTE_SIZE);
     const headerView = new DataView(header);
 
     // Set the File ID (bytes 0-15)
