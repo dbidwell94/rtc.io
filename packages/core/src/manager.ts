@@ -1,6 +1,7 @@
 import { P2PConnection, type VoidMethods } from "./p2pConnection";
 import { type ClientSignaler, type PeerId } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
+import Logger from "@rtcio/logger";
 
 const DATA_CHANNEL_GENERIC = "generic";
 const DATA_CHANNEL_BINARY = "binary";
@@ -40,7 +41,7 @@ export interface RemoteOffer {
 }
 
 export interface InternalEvents<
-  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>
+  ClientToPeerEvents extends VoidMethods<ClientToPeerEvents>,
 > {
   /**
    * A new peer has connected. Any event listeners specific to the
@@ -96,6 +97,8 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private _roomPeerId: Option<PeerId>;
   private _iceServers: RTCIceServer[];
 
+  #logger: Logger;
+
   private _dataTimeoutMs: Option<number>;
   private _maxChunkSizeBytes: Option<number>;
 
@@ -134,6 +137,13 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     this._signalingInterface = signalingInterface;
     this._dataTimeoutMs = option.unknown(dataTimeoutMs);
     this._maxChunkSizeBytes = option.unknown(maxChunkSizeBytes);
+
+    this.#logger = new Logger(
+      "rtcio:core",
+      RTC.name,
+      crypto.randomUUID().slice(0, 8),
+    );
+
     this.setupListeners();
   }
 
@@ -141,17 +151,26 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     this._signalingInterface.on(
       "offer",
       (sender, offer) => {
+        this.#logger.verbose(
+          "Offer received from peer {%s}: %o",
+          sender.substring(0, 8),
+          offer,
+        );
         this._events["connectionRequest"]?.forEach((offerCallback) => {
           offerCallback({
             remoteId: sender,
             accept: () => {
+              this.#logger.verbose(
+                "Accepted offer from peer {%s}",
+                sender.substring(0, 8),
+              );
               return this.acceptOffer(sender, offer);
             },
             reject: () => {},
           });
         });
       },
-      this._lifecycleCleanupAbortController.signal
+      this._lifecycleCleanupAbortController.signal,
     );
   }
 
@@ -179,12 +198,14 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   public on<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
     handler: InternalEvents<ClientToPeerEvent>[TKey],
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
   ) {
+    this.#logger.log("Subscribed to event: {%s}", event);
     if (abortSignal) {
       const cleanup = () => {
         this._events[event]?.delete(handler);
         abortSignal.removeEventListener("abort", cleanup);
+        this.#logger.log("Cancelled event {%s} via an AbortSignal", event);
       };
 
       abortSignal.addEventListener("abort", cleanup);
@@ -205,9 +226,22 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    */
   public off<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
-    handler: InternalEvents<ClientToPeerEvent>[TKey]
+    handler: InternalEvents<ClientToPeerEvent>[TKey],
   ) {
-    this._events[event]?.delete(handler);
+    if (!this._events[event]?.has(handler)) {
+      this.#logger.warn(
+        "Attempted to deregister callback for event {%s} but no callback was found to remove. " +
+          "This may indicate a memory leak and should be looked into",
+        event,
+      );
+      return;
+    } else {
+      this._events[event]?.delete(handler);
+      this.#logger.log(
+        "Successfully deregistered callback for event: {%s}",
+        event,
+      );
+    }
   }
 
   /**
@@ -224,15 +258,18 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    *
    */
   public async connectToRoom(): Promise<Result<PeerId>> {
+    this.#logger.verbose("Attempting to connect to room: {%s}", this._roomName);
     const myPeerIdRes = await this._signalingInterface.connectToRoom(
-      this._roomName
+      this._roomName,
     );
 
     if (myPeerIdRes.isError()) {
+      this.#logger.error("Failed to connect to room: {%s}", this._roomName);
       return myPeerIdRes;
     }
 
     this._roomPeerId = option.some(myPeerIdRes.value);
+    this.#logger.log("Successfully connected to room: {%s}", this._roomName);
     return result.ok(myPeerIdRes.value);
   }
 
@@ -252,6 +289,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * ```
    */
   public getRoomPeers(): Array<PeerId> {
+    this.#logger.verbose("Gathering room peers from the signal server");
     if (this._roomPeerId.isNone()) {
       return [];
     }
@@ -265,6 +303,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     return async (sender: PeerId, answer: RTCSessionDescriptionInit) => {
       if (sender !== peerId) return;
 
+      this.#logger.log(
+        "Setting remote description on peer: {%s}",
+        peerId.substring(0, 8),
+      );
       await connection.setRemoteDescription(answer);
     };
   }
@@ -273,6 +315,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     return async (sender: PeerId, ice: RTCIceCandidateInit) => {
       if (sender !== peerId) return;
 
+      this.#logger.log(
+        "Setting ice candidate on peer: {%s}",
+        peerId.substring(0, 8),
+      );
       await connection.addIceCandidate(ice);
     };
   }
@@ -280,7 +326,14 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   private onConnectionStateChanged(peerId: PeerId) {
     const peerStateOpt = option.unknown(this._pendingPeers.get(peerId));
 
-    if (peerStateOpt.isNone()) return () => {};
+    if (peerStateOpt.isNone()) {
+      this.#logger.verbose(
+        "Attempted to set connection state changed handler for peer: {%s} " +
+          "however the peerState could not be found",
+        peerId.substring(0, 8),
+      );
+      return () => {};
+    }
 
     const {
       connection,
@@ -298,7 +351,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
      */
     const sendOff = (
       dataChannel: RTCDataChannel,
-      binaryDataChannel: RTCDataChannel
+      binaryDataChannel: RTCDataChannel,
     ) => {
       // If we already have a connection to this peer, then we should
       // not do anything
@@ -306,7 +359,12 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         return;
       }
 
+      this.#logger.verbose(
+        "Removed onopen event listeners for RTCDataChannels for peer: {%s}",
+        peerId.substring(0, 8),
+      );
       dataChannel.onopen = null;
+      binaryDataChannel.onopen = null;
 
       const clientConnection = new P2PConnection<ClientToPeerEvent>({
         binaryDataChannel,
@@ -318,6 +376,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
           | number
           | undefined,
         onClose: () => {
+          this.#logger.verbose(
+            "P2PConnection has called RTC onClose callback. Cleanup of peer {%s} has begun.",
+            peerId.substring(0, 8),
+          );
           this._connectedPeers.delete(peerId);
           // Failsafe just to make sure we cleanup any and all data from the P2PConnection
           this._pendingPeers.delete(peerId);
@@ -331,7 +393,13 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       this._pendingPeers.delete(peerId);
       this._connectedPeers.set(peerId, clientConnection);
 
+      let callAmount = 0;
       this._events["connected"]?.forEach((callback) => {
+        this.#logger.verbose(
+          "Calling connected event callback for peer {%s} -- %s time(s)",
+          peerId.substring(0, 8),
+          ++callAmount,
+        );
         callback(clientConnection);
       });
     };
@@ -350,12 +418,20 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
             data.value.readyState !== "open" ||
             binaryData.value.readyState !== "open"
           ) {
+            this.#logger.verbose(
+              "RTCPeerConnection has been connected, but still waiting for RTCDataChannels for peer {%s}",
+              peerId.substring(0, 8),
+            );
             const connectData = [data.value, binaryData.value]
               .filter((channel) => channel.readyState !== "open")
               .map((channel) => {
                 return new Promise<void>((res) => {
                   channel.onopen = () => {
                     // cleaning up the onopen event listener
+                    this.#logger.log(
+                      "RTCDataChannel has been opened for peer: {%s}",
+                      peerId.substring(0, 8),
+                    );
                     channel.onopen = null;
                     res();
                   };
@@ -369,9 +445,20 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
           break;
         }
         case "failed": {
-          this._events["connectionFailed"]?.forEach((callback) =>
-            callback(peerId)
+          this.#logger.error(
+            "RTCPeerConnection has failed to connect for peer {%s}",
+            peerId.substring(0, 8),
           );
+
+          let failedCallbackAmount = 0;
+          this._events["connectionFailed"]?.forEach((callback) => {
+            this.#logger.verbose(
+              "Calling {connectionFailed} event callback for peer: {%s} -- %s time(s)",
+              peerId.substring(0, 8),
+              ++failedCallbackAmount,
+            );
+            callback(peerId);
+          });
           break;
         }
         default: {
@@ -383,9 +470,13 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
   private async acceptOffer(
     peerId: PeerId,
-    offer: RTCSessionDescriptionInit
+    offer: RTCSessionDescriptionInit,
   ): Promise<Result<void>> {
     if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {
+      this.#logger.error(
+        "Unable to accept offer on a pre-existing connection for peer: {%s}",
+        peerId.substring(0, 8),
+      );
       return result.err("Unable to accept offer on a pre-existing connection");
     }
     const connection = new RTCPeerConnection({ iceServers: this._iceServers });
@@ -398,6 +489,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     };
     this._pendingPeers.set(peerId, peerState);
     connection.ondatachannel = ({ channel }) => {
+      this.#logger.verbose(
+        "New data channel received for peer: {%s}",
+        peerId.substring(0, 8),
+      );
       switch (channel.label) {
         case DATA_CHANNEL_GENERIC: {
           peerState.data = option.some(channel);
@@ -409,6 +504,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       }
 
       if (peerState.binaryData.isSome() && peerState.data.isSome()) {
+        this.#logger.verbose(
+          "Received all required RTCDataChannels. Cleaning up event listeners for peer: {%s}",
+          peerId.substring(0, 8),
+        );
         this.onConnectionStateChanged(peerId)();
         // Cleaning up the ondatachannel listener as long as we have both channels
         connection.ondatachannel = null;
@@ -420,31 +519,43 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       ({ candidate }) => {
         const candidateOpt = option.unknown(candidate);
         if (candidateOpt.isSome()) {
+          this.#logger.log(
+            "New RTCIceCandidate found for peer: {%s}",
+            peerId.substring(0, 8),
+          );
           this._signalingInterface.sendIceCandidate(
             peerId,
             // this is a hack to send a class over the wire.
             // Might just need this for the LocalSignaler, but
             // doing this just to be safe.
-            JSON.parse(JSON.stringify(candidateOpt.value))
+            JSON.parse(JSON.stringify(candidateOpt.value)),
           );
         }
       },
       {
         signal: peerState.globalStateCleanupAbort.signal,
-      }
+      },
     );
 
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
-      peerState.globalStateCleanupAbort.signal
+      peerState.globalStateCleanupAbort.signal,
     );
 
     connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);
 
+    this.#logger.log(
+      "Setting remote description for peer: {%s}",
+      peerId.substring(0, 8),
+    );
     await connection.setRemoteDescription(offer);
 
     const answer = await connection.createAnswer();
+    this.#logger.log(
+      "Setting local description for peer: {%s}",
+      peerId.substring(0, 8),
+    );
     await connection.setLocalDescription(answer);
     this._signalingInterface.sendAnswer(peerId, answer);
 
@@ -457,7 +568,11 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * be fired instead.
    */
   public async connectToPeer(peerId: PeerId): Promise<Result<void>> {
-    if (this._pendingPeers.has(peerId)) {
+    if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {
+      this.#logger.error(
+        "Unable to connect with pending or already established connection for peer: {%s}",
+        peerId.substring(0, 8),
+      );
       return result.err("Peer already has or is pending a connection");
     }
     const connection = new RTCPeerConnection({ iceServers: this._iceServers });
@@ -478,14 +593,14 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       "answer",
       this.onAnswer(peerId, connection),
       // cleanup should be done after we establish connection.
-      tempStateCleanupAbort.signal
+      tempStateCleanupAbort.signal,
     );
 
     this._signalingInterface.on(
       "iceCandidate",
       this.onIceCandidate(peerId, connection),
       // cleanup should be done when the connection closes.
-      globalStateCleanupAbort.signal
+      globalStateCleanupAbort.signal,
     );
 
     connection.addEventListener(
@@ -497,15 +612,20 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
           return;
         }
 
+        this.#logger.log(
+          "RTCIceCandidate found for peer: {%s}",
+          peerId.substring(0, 8),
+        );
+
         this._signalingInterface.sendIceCandidate(
           peerId,
           // Same hack as above. Just to be safe.
-          JSON.parse(JSON.stringify(candidateOpt.value))
+          JSON.parse(JSON.stringify(candidateOpt.value)),
         );
       },
       {
         signal: globalStateCleanupAbort.signal,
-      }
+      },
     );
 
     connection.onconnectionstatechange = this.onConnectionStateChanged(peerId);
@@ -515,6 +635,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       offerToReceiveAudio: false,
       offerToReceiveVideo: false,
     });
+    this.#logger.log(
+      "Setting local description for peer: {%s}",
+      peerId.substring(0, 8),
+    );
     await connection.setLocalDescription(offer);
 
     this._signalingInterface.sendOffer(peerId, offer);
@@ -527,11 +651,12 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * the connection to the signal server if applicable.
    */
   public async close() {
+    this.#logger.log("Close handler has been called. Cleanup has started");
     // abort any in-progress event listeners for the global lifecycle
     this._lifecycleCleanupAbortController.abort();
 
     for (const [
-      ,
+      peer,
       { connection: conn, globalStateCleanupAbort, tempStateCleanupAbort },
     ] of this._pendingPeers) {
       // abort any scoped event listeners
@@ -540,10 +665,18 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
       const closeConn = new Promise<void>((res) => {
         if (conn.connectionState === "closed") {
+          this.#logger.log(
+            "RTCPeerConnection has already been closed on peer: {%s}",
+            peer.substring(0, 8),
+          );
           res();
         }
         conn.onconnectionstatechange = () => {
           if (conn.connectionState === "closed") {
+            this.#logger.log(
+              "RTCPeerConnection has been closed on pending peer: {%s}",
+              peer.substring(0, 8),
+            );
             conn.onconnectionstatechange = null;
             res();
           }
@@ -554,10 +687,12 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       await closeConn;
     }
 
-    for (const [, conn] of this._connectedPeers) {
+    for (const [peerId, conn] of this._connectedPeers) {
+      this.#logger.log("Force closing peer: {%s}", peerId.substring(0, 8));
       await conn.close();
     }
 
     await this._signalingInterface.close();
+    this.#logger.log("ClientSignaler has been closed");
   }
 }
