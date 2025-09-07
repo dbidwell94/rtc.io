@@ -6,6 +6,7 @@ import {
   JsonValue,
 } from "./binaryData";
 import { Option, result, Result } from "@dbidwell94/ts-utils";
+import Logger from "@rtcio/logger";
 
 /**
  * This event name is called when another peer has signaled to use
@@ -100,6 +101,8 @@ export class P2PConnection<
   private _binaryData: RTCDataChannel;
   private _peerId: PeerId;
 
+  #logger: Logger;
+
   private _onCloseManagerCallback: () => MaybePromise<void>;
   private _calledCloseHandlers: boolean = false;
 
@@ -112,6 +115,17 @@ export class P2PConnection<
     dataTimeout = 5_000, // 5 seconds
     maxChunkSize = 1024, // 1KB
   }: P2POptions) {
+    this.#logger = new Logger(
+      "rtcio:core",
+      P2PConnection.name,
+      peerId.substring(0, 8),
+    );
+
+    this.#logger.log("P2PConnection created with the following options: %o", {
+      dataTimeout: `${dataTimeout}ms`,
+      maxChunkSize: `${maxChunkSize} bytes`,
+    });
+
     this._connection = connection;
     this._peerId = peerId;
     this._data = genericDataChannel;
@@ -120,6 +134,7 @@ export class P2PConnection<
       onDataTimeout: this.onDataTimedOut,
       dataTimeout,
       maxChunkSize,
+      instanceId: peerId.substring(0, 8),
     });
     this._data.binaryType = "arraybuffer";
     this._binaryData.binaryType = "arraybuffer";
@@ -134,6 +149,7 @@ export class P2PConnection<
         await this.handleBinaryData(data as ArrayBuffer);
         return;
       }
+      this.#logger.error("Unknown data received from binary RTCDataChannel");
       await this.emitError(
         new Error("Unknown data received from binary RTCDataChannel"),
       );
@@ -141,6 +157,7 @@ export class P2PConnection<
 
     this._data.onmessage = async ({ data }) => {
       if (typeof data !== "string") {
+        this.#logger.error("Unknown data received from generic RTCDataChannel");
         await this.emitError(
           new Error("Unknown data received from generic RTCDataChannel"),
         );
@@ -152,6 +169,10 @@ export class P2PConnection<
 
     this._connection.onconnectionstatechange = async (evt) => {
       const connection = evt.target as RTCPeerConnection;
+      this.#logger.verbose(
+        "RTCPeerConnection connection state change: {%s}",
+        connection.connectionState,
+      );
       switch (connection.connectionState) {
         case "closed": {
           await this.close();
@@ -165,10 +186,15 @@ export class P2PConnection<
   }
 
   private async onDataTimedOut(dataId: string) {
+    this.#logger.warn(
+      "Data has timed out. Informing handlers. DataId: {%s}",
+      dataId,
+    );
     this.callHandlers("dataTimedOut", dataId);
   }
 
   private async emitError(error: Error) {
+    this.#logger.verbose("Error received. Informing handlers");
     this.callHandlers("error", error);
   }
 
@@ -184,12 +210,25 @@ export class P2PConnection<
     key: TKey,
     ...args: Parameters<EventMap<ClientToPeerEvents>[TKey]>
   ) {
+    this.#logger.verbose("callHandlers");
+    let eventsCallCount = 0;
     for (const callback of this._events[key] ?? []) {
+      this.#logger.verbose(
+        "Calling persistant handlers for event: {%s} -- count: %s time(s)",
+        key,
+        ++eventsCallCount,
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await callback(...(args as any[]));
     }
 
+    let oneShotCallCount = 0;
     for (const callback of this._oneShotEvents[key] ?? []) {
+      this.#logger.verbose(
+        "Calling one shot handlers for event: {%s} -- count: %s time(s)",
+        key,
+        ++oneShotCallCount,
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await callback(...(args as any[]));
       this._oneShotEvents[key]?.delete(callback);
@@ -215,10 +254,19 @@ export class P2PConnection<
       ((this._events["fileStream"]?.size ?? 0 > 0) ||
         (this._oneShotEvents["fileStream"]?.size ?? 0 > 0))
     ) {
+      this.#logger.log("Received a new file stream. Details: %o", {
+        type: optMetadata.value.type,
+        size: optMetadata.value.size,
+        name: optMetadata.value.name,
+      });
       this.handleFileStream(id, optMetadata.value);
     }
 
     if (optData.isSome()) {
+      this.#logger.log(
+        "Finished data reconstruction for dataId: {%s}",
+        id.substring(0, 8),
+      );
       const data = optData.value;
 
       if (optMetadata.isSome() && metadataIsForFile(optMetadata.value)) {
@@ -232,9 +280,15 @@ export class P2PConnection<
   }
 
   private async handleFileStream(fileId: string, metadata: FileMetadata) {
+    this.#logger.verbose("handleFileStream -- dataId: {%s}", fileId);
     const mainStreamResult = this._chunker.setDataIsStream(fileId);
 
     if (mainStreamResult.isError()) {
+      this.#logger.error(
+        "An error occurred in the file stream for dataId: {%s} -- %o",
+        fileId,
+        mainStreamResult.error,
+      );
       this.emitError(mainStreamResult.error);
       return;
     }
@@ -246,7 +300,17 @@ export class P2PConnection<
         Array.from(this._oneShotEvents["fileStream"] ?? []),
       );
 
+    this.#logger.verbose(
+      "Found %s listeners for the `fileStream` event. dataId: {%s}",
+      listeners.length,
+      fileId,
+    );
+
     if (listeners.length === 1) {
+      this.#logger.verbose(
+        "Only one listener for `fileStream`, not teeing data. dataId: {%s}",
+        fileId,
+      );
       const [callback] = listeners;
       callback(metadata, mainStream);
       this._oneShotEvents["fileStream"]?.delete(callback);
@@ -261,6 +325,12 @@ export class P2PConnection<
         streams.push(...streams.pop()!.tee());
       }
 
+      this.#logger.verbose(
+        "Multiple listeners for `fileStream` detected. Splitting into %s streams for dataId",
+        streams.length,
+        fileId,
+      );
+
       listeners.forEach((callback, index) => {
         callback(metadata, streams[index]);
         this._oneShotEvents["fileStream"]?.delete(callback);
@@ -269,9 +339,15 @@ export class P2PConnection<
   }
 
   private async handleStringData(data: string) {
+    this.#logger.verbose("handleStringData");
     try {
       const messageData: InternalMessageEvent<ClientToPeerEvents> =
         JSON.parse(data);
+
+      this.#logger.verbose(
+        "Parsed message data for event: {%s}",
+        messageData.event,
+      );
 
       if (messageData.event === INTERNAL_BYE) {
         await this.close();
@@ -280,12 +356,15 @@ export class P2PConnection<
 
       await this.callHandlers(messageData.event, ...messageData.args);
     } catch (err) {
+      this.#logger.error("Error during message data parsing: %o", err);
       await this.callHandlers("error", err as Error);
     }
   }
 
   private async onClosed() {
+    this.#logger.verbose("onClosed");
     if (this._calledCloseHandlers) {
+      this.#logger.verbose("All handlers have already been called");
       return;
     }
     await this.callHandlers("connectionClosed", this._peerId);
@@ -298,10 +377,12 @@ export class P2PConnection<
   }
 
   private async waitForBinaryBuffer(): Promise<Result<void>> {
+    this.#logger.verbose("waitForBinaryBuffer");
     if (
       this._binaryData.bufferedAmount >
       this._binaryData.bufferedAmountLowThreshold
     ) {
+      this.#logger.verbose("Binary buffer shows low. Waiting for space");
       const res = await result.fromPromise(
         new Promise<void>((res, rej) => {
           const waitTimeout = setTimeout(() => {
@@ -320,6 +401,7 @@ export class P2PConnection<
               onBufferAmountLow,
             );
             clearTimeout(waitTimeout);
+            this.#logger.verbose("Binary data buffer space is now available");
             res();
           };
 
@@ -331,6 +413,10 @@ export class P2PConnection<
       );
 
       if (res.isError()) {
+        this.#logger.error(
+          "An error occurred waiting for binary buffer space. %o",
+          res.error,
+        );
         return result.err(res.error);
       }
     }
@@ -339,7 +425,9 @@ export class P2PConnection<
   }
 
   private async waitForGenericBuffer(): Promise<Result<void>> {
+    this.#logger.verbose("waitForGenericBuffer");
     if (this._data.bufferedAmount > this._data.bufferedAmountLowThreshold) {
+      this.#logger.verbose("Generic buffer shows low. Waiting for space");
       const res = await result.fromPromise(
         new Promise<void>((res, rej) => {
           const waitTimeout = setTimeout(() => {
@@ -358,6 +446,7 @@ export class P2PConnection<
               onBufferAmountLow,
             );
             clearTimeout(waitTimeout);
+            this.#logger.verbose("Generic data buffer space is now available");
             res();
           };
 
@@ -366,6 +455,10 @@ export class P2PConnection<
       );
 
       if (res.isError()) {
+        this.#logger.error(
+          "An error occurred waiting for generic buffer space. %o",
+          res.error,
+        );
         return result.err(res.error);
       }
     }
@@ -376,25 +469,32 @@ export class P2PConnection<
     data: ArrayBuffer,
     metadata?: T,
   ): Promise<Result<void>> {
+    this.#logger.verbose("sendRaw");
     const chunks = this._chunker.chunkData(data, metadata);
+    this.#logger.log("Starting binary data transfer");
 
     for await (const chunk of chunks) {
       const waitRes = await this.waitForBinaryBuffer();
 
       if (waitRes.isError()) {
+        // no need to log here, we already log in waitForBinaryBuffer
         return waitRes;
       }
 
       try {
+        this.#logger.verbose("Sending data via the Binary RTCDataChannel");
         this._binaryData.send(chunk);
       } catch (err) {
+        this.#logger.error("An error occurred sending binary data. %o", err);
         return result.err(err as Error);
       }
     }
+    this.#logger.log("Finished sending binary data");
     return result.ok(undefined);
   }
 
   async sendFile(file: File): Promise<Result<void>> {
+    this.#logger.verbose("sendFile");
     const fileMetadata: FileMetadata = {
       name: file.name,
       size: file.size,
@@ -402,12 +502,21 @@ export class P2PConnection<
       type: file.type,
       _internalIsFile: true,
     };
+    this.#logger.log("Sending a file via the Binary RTCDataChannel: %o", {
+      name: fileMetadata.name,
+      size: fileMetadata.size,
+      type: fileMetadata.type,
+    });
 
     return this.sendRaw(await file.arrayBuffer(), fileMetadata);
   }
 
   private async sendClosed() {
+    this.#logger.verbose("sendClosed");
     if (this._data.readyState !== "open") {
+      this.#logger.verbose(
+        "Generic RTCDataChannel is already closed. Halting process",
+      );
       return;
     }
 
@@ -425,6 +534,10 @@ export class P2PConnection<
     try {
       this._data.send(JSON.stringify(message));
     } catch (e) {
+      this.#logger.error(
+        "An error occurred sending GOODBYE packet to peer. %o",
+        e,
+      );
       this.callHandlers("error", e as Error);
     }
   }
@@ -433,12 +546,14 @@ export class P2PConnection<
     event: TKey,
     ...args: Parameters<ClientToPeerEvents[TKey]>
   ): Promise<Result<void>> {
+    this.#logger.verbose("emit");
     // TODO! handle the creation of this message better so that I don't have to
     // cast `as unknown as T` :puke:.
     const message = {
       event,
       args,
     } as unknown as InternalMessageEvent<ClientToPeerEvents>;
+    this.#logger.verbose("Emitting event to remote peer. Event: %s", event);
 
     const waitRes = await this.waitForGenericBuffer();
     if (waitRes.isError()) {
@@ -448,6 +563,11 @@ export class P2PConnection<
     try {
       this._data.send(JSON.stringify(message));
     } catch (e) {
+      this.#logger.error(
+        "An error occurred emitting event to remote peer. Event: %s %o",
+        event,
+        e,
+      );
       return result.err(e as Error);
     }
     return result.ok(undefined);
@@ -465,6 +585,7 @@ export class P2PConnection<
     event: TKey,
     callback: EventMap<ClientToPeerEvents>[TKey],
   ) {
+    this.#logger.log("Registering one-shot event for event: %s", event);
     if (this._oneShotEvents[event]) {
       this._oneShotEvents[event].add(callback);
     } else {
@@ -484,6 +605,10 @@ export class P2PConnection<
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
   ) {
+    this.#logger.log(
+      "Registering persistant event listener for event: %s",
+      event,
+    );
     if (this._events[event]) {
       this._events[event].add(handler);
     } else {
@@ -504,27 +629,52 @@ export class P2PConnection<
     handler: EventMap<ClientToPeerEvents>[TKey],
   ) {
     if (this._events[event]?.has(handler)) {
+      this.#logger.log("Removed event listener for event: %s", event);
       this._events[event].delete(handler);
+    } else {
+      this.#logger.warn(
+        "Attempted to remove an event listener for event {%s} " +
+          "but callback could not be located in the event map. " +
+          "This may indicate a memory leak and should be addressed",
+        event,
+      );
     }
   }
 
   async close() {
+    this.#logger.verbose("close");
+    this.#logger.log(
+      "Request to close P2PConnection received. Beginning cleanup",
+    );
     const closeData = new Promise<void>((res) => {
       if (this._data.readyState === "closed") {
+        this.#logger.log("Generic RTCDataChannel already closed.");
         res();
         return;
       }
-      this._data.onclose = () => res();
+      this._data.onclose = () => {
+        this.#logger.log(
+          "Generic RTCDataChannel connection successfully closed.",
+        );
+        res();
+      };
     });
     const closeBinaryData = new Promise<void>((res) => {
       if (this._binaryData.readyState === "closed") {
+        this.#logger.log("Binary RTCDataChannel already closed.");
         res();
         return;
       }
-      this._binaryData.onclose = () => res();
+      this._binaryData.onclose = () => {
+        this.#logger.log(
+          "Binary RTCDataChannel connection successfully closed.",
+        );
+        res();
+      };
     });
     const closeConn = new Promise<void>((res) => {
       if (this._connection.connectionState === "closed") {
+        this.#logger.log("RTCPeerConnection already closed.");
         res();
         return;
       }

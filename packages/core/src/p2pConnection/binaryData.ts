@@ -6,6 +6,7 @@
 // 20      -- boolean flag representing if this is the final chunk
 
 import { Option, option, result, Result } from "@dbidwell94/ts-utils";
+import Logger from "@rtcio/logger";
 
 /**
  * Represents any valid JSON-serializable primitive value.
@@ -38,6 +39,7 @@ interface ChunkHeader {
 export interface BinaryChunkerOptions {
   maxChunkSize?: number;
   dataTimeout?: number;
+  instanceId?: string;
   onDataTimeout: (dataId: string) => void;
 }
 
@@ -59,6 +61,8 @@ export class BinaryChunker {
   private _dataTimeoutMs: number;
   private _onDataTimeout: (dataId: string) => void;
 
+  #logger: Logger;
+
   private _streams: Map<
     string,
     {
@@ -76,6 +80,7 @@ export class BinaryChunker {
     maxChunkSize = 1024,
     dataTimeout = 5000,
     onDataTimeout,
+    instanceId,
   }: BinaryChunkerOptions) {
     if (maxChunkSize <= HEADER_BYTE_SIZE) {
       throw new Error(
@@ -85,6 +90,12 @@ export class BinaryChunker {
     this._maxChunkSize = maxChunkSize;
     this._dataTimeoutMs = dataTimeout;
     this._onDataTimeout = onDataTimeout;
+
+    this.#logger = new Logger("rtcio:core", BinaryChunker.name, instanceId);
+    this.#logger.log("BinaryChunker created with options: %o", {
+      maxChunkSize,
+      dataTimeout,
+    });
   }
 
   /**
@@ -100,6 +111,7 @@ export class BinaryChunker {
     dataToChunk: ArrayBuffer,
     metadata?: T,
   ): AsyncGenerator<ArrayBuffer> {
+    this.#logger.verbose("chunkData");
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(new Uint8Array(dataToChunk));
@@ -114,10 +126,20 @@ export class BinaryChunker {
     dataStream: ReadableStream<Uint8Array>,
     metadata?: T,
   ): AsyncGenerator<ArrayBuffer> {
+    this.#logger.verbose("streamData");
     const dataId = crypto.randomUUID();
+    this.#logger.log(
+      "Streaming data for dataId {%s} with max chunk size of %d bytes",
+      dataId.substring(0, 8),
+      this._maxChunkSize,
+    );
     const dataIdBytes = this.uuidToBytes(dataId);
 
     yield this.buildMetadata(metadata ?? null, dataIdBytes);
+    this.#logger.verbose(
+      "Sent metadata chunk for dataId: %s",
+      dataId.substring(0, 8),
+    );
 
     // start at 1, 0 is the metadata
     let chunkIndex = 1;
@@ -177,12 +199,20 @@ export class BinaryChunker {
       } else {
         yield this.buildHeader(dataIdBytes, chunkIndex, true);
       }
+
+      this.#logger.log(
+        "Finished chunking data for dataId: {%s}",
+        dataId.substring(0, 8),
+      );
+    } catch (e) {
+      this.#logger.error("An error occurred reading from stream: %o", e);
     } finally {
       reader.releaseLock();
     }
   }
 
   setDataIsStream(dataId: string): Result<ReadableStream<Uint8Array>> {
+    this.#logger.log("Marking data as a stream for dataId: {%s}", dataId);
     const timeoutHandler = () => {
       const optData = option.unknown(this._streams.get(dataId));
       if (optData.isNone()) return;
@@ -194,6 +224,16 @@ export class BinaryChunker {
       this._onDataTimeout(dataId);
       // Close the controller with an error indicating that
       // a timeout has occurred
+      this.#logger.error(
+        "Timeout of %d ms was reached when receiving packets for dataId: {%s}. " +
+          "There might be a couple of reasons for this. \n" +
+          " 1: Network speed is too slow\n" +
+          " 2: Chunk size is too large for the current network speed\n" +
+          " 3: Your data timeout is too small. Consider increasing.\n" +
+          " Remember. The data timeout is per-packet, not per-file",
+        this._dataTimeoutMs,
+        dataId.substring(0, 8),
+      );
       controller.error(
         new Error(
           `Timeout of ${this._dataTimeoutMs} ms was reached when receiving packets`,
@@ -212,10 +252,18 @@ export class BinaryChunker {
         this._streams.delete(dataId);
       },
       start: (controller) => {
+        this.#logger.verbose(
+          "Started stream for dataId: {%s}",
+          dataId.substring(0, 8),
+        );
         const chunksObj = option
           .unknown(this._chunks.get(dataId))
           .okOr("Unable to get chunks from internal BinaryChunker state");
         if (chunksObj.isError()) {
+          this.#logger.error(
+            "Unable to get chunks from internal BinaryChunker state. %o",
+            chunksObj.error,
+          );
           return result.err(chunksObj.error);
         }
         const { buffers, cleanupTimeout, hasFinal, totalExpectedSize } =
@@ -274,6 +322,17 @@ export class BinaryChunker {
       return setTimeout(() => {
         this._chunks.delete(header.id);
         this._onDataTimeout(header.id);
+
+        this.#logger.error(
+          "Timeout of %d ms was reached when receiving packets for dataId: {%s}. " +
+            "There might be a couple of reasons for this. \n" +
+            " 1: Network speed is too slow\n" +
+            " 2: Chunk size is too large for the current network speed\n" +
+            " 3: Your data timeout is too small. Consider increasing.\n" +
+            " Remember. The data timeout is per-packet, not per-file",
+          this._dataTimeoutMs,
+          header.id.substring(0, 8),
+        );
       }, this._dataTimeoutMs);
     };
 
@@ -293,6 +352,10 @@ export class BinaryChunker {
     }
 
     if (header.chunkIndex === 0) {
+      this.#logger.verbose(
+        "Received 0 index chunk. Parsing metadata from buffer. dataId: {%s}",
+        header.id.substring(0, 8),
+      );
       const metadata = this.parseMetadata(chunk.slice(HEADER_BYTE_SIZE));
       this._chunks.get(header.id)!.metadata = metadata;
     }
@@ -311,6 +374,10 @@ export class BinaryChunker {
       Object.keys(transfer).length ===
         this._chunks.get(header.id)!.totalExpectedSize
     ) {
+      this.#logger.log(
+        "Received full data. Ressembling packets. dataId: %s",
+        header.id.substring(0, 8),
+      );
       // remove the metadata buffer from the transfer array. No longer needed.
       transfer.shift()!;
 
@@ -367,6 +434,10 @@ export class BinaryChunker {
     // and we had the final object, then the data is complete and has all been
     // enqueued
     if (streamObj.hasFinal && buffers.length === 0) {
+      this.#logger.log(
+        "Received final chunk for stream. Closing controller. dataId: {%s}",
+        header.id.substring(0, 8),
+      );
       controller.close();
       this._streams.delete(header.id);
     } else {
