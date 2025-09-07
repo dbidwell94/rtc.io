@@ -96,34 +96,89 @@ export class BinaryChunker {
     return HEADER_BYTE_SIZE;
   }
 
-  *chunkData<T extends JsonValue = null>(
+  chunkData<T extends JsonValue = null>(
     dataToChunk: ArrayBuffer,
     metadata?: T,
-  ): Generator<ArrayBuffer> {
+  ): AsyncGenerator<ArrayBuffer> {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(dataToChunk));
+        controller.close();
+      },
+    });
+
+    return this.streamData(stream, metadata);
+  }
+
+  async *streamData<T extends JsonValue = null>(
+    dataStream: ReadableStream<Uint8Array>,
+    metadata?: T,
+  ): AsyncGenerator<ArrayBuffer> {
     const dataId = crypto.randomUUID();
-
     const dataIdBytes = this.uuidToBytes(dataId);
-
-    const payloadSize = this._maxChunkSize - HEADER_BYTE_SIZE;
-
-    // adding 1 here because of the metadata chunk
-    const totalChunks = Math.ceil(dataToChunk.byteLength / payloadSize);
-
-    let chunkId = 1;
 
     yield this.buildMetadata(metadata ?? null, dataIdBytes);
 
-    for (let i = 0; i < dataToChunk.byteLength; i += payloadSize) {
-      const isLastChunk = chunkId === totalChunks;
+    // start at 1, 0 is the metadata
+    let chunkIndex = 1;
 
-      const header = this.buildHeader(dataIdBytes, chunkId, isLastChunk);
+    const buffer = new Uint8Array(this._maxChunkSize);
+    let bufferCursor = HEADER_BYTE_SIZE;
 
-      const start = i;
-      const end = Math.min(i + payloadSize, dataToChunk.byteLength);
-      const chunkPayload = dataToChunk.slice(start, end);
+    const reader = dataStream.getReader();
+    try {
+      let readDone = false;
+      while (!readDone) {
+        const { done, value } = await reader.read();
+        if (done || !value || value.byteLength < 1) {
+          readDone = true;
+          break;
+        }
 
-      chunkId += 1;
-      yield this.concatBuffers(header, chunkPayload);
+        // represents where in the current {value} we are.
+        let valueCursor = 0;
+
+        while (valueCursor < value.byteLength) {
+          const spaceInBuffer = this._maxChunkSize - bufferCursor;
+          const dataLeftInBytes = value.byteLength - valueCursor;
+          const bytesToCopy = Math.min(spaceInBuffer, dataLeftInBytes);
+
+          const valueSlice = value.subarray(
+            valueCursor,
+            valueCursor + bytesToCopy,
+          );
+          buffer.set(valueSlice, bufferCursor);
+
+          valueCursor += bytesToCopy;
+          bufferCursor += bytesToCopy;
+
+          if (bufferCursor === this._maxChunkSize) {
+            // Have to create a copy, otherwise will be overwriting the buffer before
+            // it has been sent.
+            yield this.buildHeader(
+              dataIdBytes,
+              chunkIndex,
+              false,
+              buffer.buffer,
+            ).slice(0);
+            chunkIndex += 1;
+            bufferCursor = HEADER_BYTE_SIZE;
+          }
+        }
+      }
+
+      // edge case, we didn't have a full buffer in the while loop and we still have data
+      // to send in the buffer
+      if (bufferCursor !== HEADER_BYTE_SIZE) {
+        // we don't need to take the ArrayBuffer, it has been written into the
+        // buffer variable
+        this.buildHeader(dataIdBytes, chunkIndex, true, buffer.buffer);
+        yield buffer.slice(0, bufferCursor).buffer;
+      } else {
+        yield this.buildHeader(dataIdBytes, chunkIndex, true);
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
@@ -322,12 +377,16 @@ export class BinaryChunker {
     }
   }
 
+  /**
+   * This will either return a new ArrayBuffer, or will modify the incoming
+   * header param to put the header at the start of the buffer
+   */
   private buildHeader(
     fileId: Uint8Array,
     chunkIndex: number,
     isLast: boolean,
+    header: ArrayBuffer = new ArrayBuffer(HEADER_BYTE_SIZE),
   ): ArrayBuffer {
-    const header = new ArrayBuffer(HEADER_BYTE_SIZE);
     const headerView = new DataView(header);
 
     // Set the File ID (bytes 0-15)

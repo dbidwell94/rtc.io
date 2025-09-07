@@ -3,6 +3,7 @@
 const wrtc = require("@roamhq/wrtc");
 const util = require("util");
 const stream = require("node:stream/web");
+const blob = require("node:buffer");
 
 Object.defineProperties(globalThis, {
   TextEncoder: { value: util.TextEncoder },
@@ -12,4 +13,6 @@ Object.defineProperties(globalThis, {
   RTCSessionDescription: { value: wrtc.RTCSessionDescription },
   RTCIceCandidate: { value: wrtc.RTCIceCandidate },
   ReadableStream: { value: stream.ReadableStream },
+  File: { value: blob.File },
+  Blob: { value: blob.Blob },
 });

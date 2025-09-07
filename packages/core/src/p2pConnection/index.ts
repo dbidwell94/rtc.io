@@ -378,7 +378,7 @@ export class P2PConnection<
   ): Promise<Result<void>> {
     const chunks = this._chunker.chunkData(data, metadata);
 
-    for (const chunk of chunks) {
+    for await (const chunk of chunks) {
       const waitRes = await this.waitForBinaryBuffer();
 
       if (waitRes.isError()) {
