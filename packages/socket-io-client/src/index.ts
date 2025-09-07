@@ -7,6 +7,7 @@ import {
   Result,
   Some,
 } from "@dbidwell94/ts-utils";
+import Logger from "@rtcio/logger";
 
 export interface SocketIoClientToServerEvent {
   connectToRoom: (roomName: string) => void;
@@ -29,6 +30,8 @@ export default class SocketIoSignaler implements ClientSignaler {
   >;
   private _roomClients: Set<PeerId> = new Set();
 
+  #logger: Logger;
+
   // awaiting this promise ensures that the client is connected to the signal server
   private _ensureConnected: Promise<void>;
 
@@ -46,25 +49,38 @@ export default class SocketIoSignaler implements ClientSignaler {
       });
     });
 
+    this.#logger = new Logger(
+      "rtcio:socket-io-client",
+      SocketIoSignaler.name,
+      crypto.randomUUID().substring(0, 8),
+    );
+
     this._id = option.none();
     this.setupListeners();
   }
 
   private setupListeners() {
+    this.#logger.log("Socket.IO signaler created. Subscribing to events.");
     this._socket.on("newPeerConnected", (id) => {
+      this.#logger.verbose(
+        "New peer connected. peerId: %s",
+        id.substring(0, 8),
+      );
       this._roomClients.add(id);
     });
 
     this._socket.on("peerLeft", (id) => {
+      this.#logger.verbose("Peer left room. peerId: %s", id.substring(0, 8));
       this._roomClients.delete(id);
     });
 
     this._socket.on("connect_error", (err) => {
-      console.error(err);
+      this.#logger.error("Connection error: %o", err);
     });
   }
 
   getRoomPeers(): Array<PeerId> {
+    this.#logger.verbose("getRoomPeers");
     if (this._id.isNone()) {
       return [...this._roomClients];
     }
@@ -76,18 +92,37 @@ export default class SocketIoSignaler implements ClientSignaler {
   }
 
   sendOffer(toPeer: PeerId, offer: RTCSessionDescriptionInit): void {
+    this.#logger.verbose(
+      "Sending offer to peer: %s -- %o",
+      toPeer.substring(0, 8),
+      offer,
+    );
     this._socket.emit("offer", toPeer, offer);
   }
 
   sendAnswer(toPeer: PeerId, answer: RTCSessionDescriptionInit): void {
+    this.#logger.verbose(
+      "Sending answer to peer: %s -- %o",
+      toPeer.substring(0, 8),
+      answer,
+    );
     this._socket.emit("answer", toPeer, answer);
   }
 
   sendIceCandidate(toPeer: PeerId, candidate: RTCIceCandidateInit): void {
+    this.#logger.verbose(
+      "Sending ice candidate to peer: %s -- %o",
+      toPeer.substring(0, 8),
+      candidate,
+    );
     this._socket.emit("iceCandidate", toPeer, candidate);
   }
 
   rejectOffer(toPeer: PeerId): void {
+    this.#logger.verbose(
+      "Sending offer rejection to peer: %s",
+      toPeer.substring(0, 8),
+    );
     this._socket.emit("rejectOffer", toPeer);
   }
 
@@ -95,6 +130,7 @@ export default class SocketIoSignaler implements ClientSignaler {
     event: E,
     listener: SignalerEvents[E],
   ): void {
+    this.#logger.log("Registering event listener for event: %s", event);
     this._socket.on(
       event,
       listener as Parameters<typeof this._socket.on<E>>[1],
@@ -105,6 +141,7 @@ export default class SocketIoSignaler implements ClientSignaler {
     event: E,
     listener: SignalerEvents[E],
   ): void {
+    this.#logger.log("Removing event listener for event: %s", event);
     this._socket.off(
       event,
       listener as Parameters<typeof this._socket.on<E>>[1],
@@ -112,8 +149,14 @@ export default class SocketIoSignaler implements ClientSignaler {
   }
 
   async connectToRoom(roomName: string): Promise<Result<PeerId>> {
+    this.#logger.log("Connecting to room: %s", roomName);
     const connectedRes = await result.fromPromise(this._ensureConnected);
     if (connectedRes.isError()) {
+      this.#logger.error(
+        "Failed to connect to room: %s -- %o",
+        roomName,
+        connectedRes.error,
+      );
       return result.err(connectedRes.error);
     }
 
@@ -125,6 +168,7 @@ export default class SocketIoSignaler implements ClientSignaler {
   }
 
   async close(): Promise<void> {
+    this.#logger.log("Closing signaler...");
     this._socket.close();
   }
 }

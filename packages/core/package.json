@@ -24,7 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@roamhq/wrtc": "^0.9.0",
-    "@rtcio/signal-local": "^0.1.0",
+    "@rtcio/signal-local": "file:../signalLocalBrowser",
     "@types/node": "^24.3.0",
     "wait-for-expect": "^4.0.0",
     "@rtcio/signaling": "file:../signaling"
