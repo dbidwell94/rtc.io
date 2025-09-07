@@ -2,6 +2,7 @@
   "name": "@rtcio/socket-io-client",
   "version": "0.1.0",
   "main": "src/index.ts",
+  "private": true,
   "scripts": {},
   "keywords": [
     "rtcio",
