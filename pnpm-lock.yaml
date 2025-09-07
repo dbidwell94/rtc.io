@@ -45,18 +45,18 @@ importers:
 
   packages/core:
     dependencies:
-      '@rtcio/logging':
-        specifier: file:../logger
+      '@rtcio/logger':
+        specifier: workspace:../logger
         version: link:../logger
     devDependencies:
       '@roamhq/wrtc':
         specifier: ^0.9.0
         version: 0.9.0
       '@rtcio/signal-local':
-        specifier: file:../signalLocalBrowser
+        specifier: workspace:../signalLocalBrowser
         version: link:../signalLocalBrowser
       '@rtcio/signaling':
-        specifier: file:../signaling
+        specifier: workspace:../signaling
         version: link:../signaling
       '@types/node':
         specifier: ^24.3.0
@@ -77,6 +77,9 @@ importers:
 
   packages/signalLocalBrowser:
     dependencies:
+      '@rtcio/logger':
+        specifier: workspace:../logger
+        version: link:../logger
       broadcast-channel:
         specifier: ^7.1.0
         version: 7.1.0
@@ -90,10 +93,10 @@ importers:
   packages/socket-io-client:
     dependencies:
       '@rtcio/logger':
-        specifier: file:../logger
+        specifier: workspace:../logger
         version: link:../logger
       '@rtcio/signaling':
-        specifier: file:../signaling
+        specifier: workspace:../signaling
         version: link:../signaling
       socket.io-client:
         specifier: ^4.8
@@ -102,17 +105,17 @@ importers:
   packages/socket-io-server:
     dependencies:
       '@rtcio/logger':
-        specifier: file:../logger
+        specifier: workspace:../logger
         version: link:../logger
       '@rtcio/signaling':
-        specifier: file:../signaling
+        specifier: workspace:../signaling
         version: link:../signaling
       socket.io:
         specifier: ^4.8
         version: 4.8.1
     devDependencies:
       '@rtcio/socket-io-client':
-        specifier: file:../socket-io-client
+        specifier: workspace:../socket-io-client
         version: link:../socket-io-client
 
 packages:

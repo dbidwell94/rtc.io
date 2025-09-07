@@ -21,8 +21,8 @@
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
-    "@rtcio/signaling": "file:../signaling",
-    "@rtcio/logger": "file:../logger",
+    "@rtcio/signaling": "workspace:../signaling",
+    "@rtcio/logger": "workspace:../logger",
     "socket.io-client": "^4.8"
   }
 }

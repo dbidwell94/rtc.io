@@ -20,7 +20,8 @@
   "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
-    "broadcast-channel": "^7.1.0"
+    "broadcast-channel": "^7.1.0",
+    "@rtcio/logger": "workspace:../logger"
   },
   "devDependencies": {
     "wait-for-expect": "^4.0.0"
