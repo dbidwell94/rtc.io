@@ -13,8 +13,24 @@ chaining.
     - @rtcio/signal-local
   - Default server side signaler implementation available at:
     - @rtcio/socket-io-server
+- Binary data handling
+- Automatic data chunking with configurable chunk sizes
+  - Support for out-of-order binary data receiving
+- Native support for sending `File`s
+  - Uses `ReadableStream` under the hood to reduce memory allocations
+    for both sending and receiving large data files
+  - Binary data is handled on a completely different data channel so as
+    not to clog up real time messaging events
 - Generic typed parameters for custom events listeners and emitters
-- Optional pre-built wrapper for React via `@rtcio/react`
+- Logging available via the [debug](https://www.npmjs.com/package/debug) library
+  - All packages are scoped to their npm name -- `rtcio:{pkg-name}:{class-name}:[instanceId]{:logLevel?}`
+    - Log Levels:
+      - warn
+      - error
+      - verbose
+      - log (will not include a log level)
+    - eg. `rtcio:core:RTC:[1a2b3c4d]:warn This is a warning level`
+    - eg. `rtcio:signal-local:LocalSignalServer:[1a2b3c4d] This is a standard log`
 - Create your own signaler by extending `ClientSignaler` in `@rtcio/signaling`
 
 ## Roadmap
@@ -22,6 +38,7 @@ chaining.
 - Handle audio and visual streams
 - Custom signaler with raw websockets
 - Custom signaler with raw Server Sent Events (SSE)
+- Pre-built wrapper for React via `@rtcio/react`
 
 ## Usage/Examples
 

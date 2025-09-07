@@ -19,11 +19,11 @@
   "files": [],
   "exclude": ["./jest.setup.js"],
   "references": [
+    { "path": "./packages/logger" },
     { "path": "./packages/core" },
     { "path": "./packages/signalLocalBrowser" },
     { "path": "./packages/signaling" },
     { "path": "./packages/socket-io-client" },
-    { "path": "./packages/socket-io-server" },
-    { "path": "./packages/react" }
+    { "path": "./packages/socket-io-server" }
   ]
 }
