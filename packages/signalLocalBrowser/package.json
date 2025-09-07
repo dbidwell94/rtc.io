@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "main": "src/index.ts",
   "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "files": [
     "dist",
-    "../../LICENSE"
+    "package.json"
   ],
   "exports": {
     ".": "./dist/index.js"
@@ -14,7 +18,12 @@
     "rtcio",
     "signal",
     "signal server",
-    "local"
+    "server",
+    "local",
+    "testing",
+    "development",
+    "webrtc",
+    "p2p"
   ],
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",

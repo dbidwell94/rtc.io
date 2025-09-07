@@ -4,10 +4,12 @@
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "files": [
     "dist",
-    "../../LICENSE",
-    "package.json",
-    "README.md"
+    "package.json"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "exports": {
     ".": "./dist/index.js"
   },
@@ -15,7 +17,13 @@
     "WebRTC",
     "RTCPeerConnection",
     "P2P",
-    "rtcio"
+    "rtcio",
+    "RTCDataChannel",
+    "file",
+    "streaming",
+    "binary",
+    "message",
+    "messaging"
   ],
   "main": "dist/index.ts",
   "scripts": {},

@@ -3,20 +3,28 @@
   "version": "0.1.0",
   "main": "src/index.ts",
   "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "keywords": [
     "rtcio",
     "signaling",
     "RTC",
-    "WebRTC"
+    "WebRTC",
+    "typescript",
+    "custom",
+    "RTCPeerConnection",
+    "RTCDataChannel"
   ],
   "files": [
-    "../../LICENSE",
-    "dist"
+    "dist",
+    "package.json"
   ],
   "exports": {
     ".": "./dist/index.js"
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
-  "description": "A lightweight interface for use in creating custom signaling for use with the @rtcio ecosystem"
+  "description": "A types only package for use in creating custom signaling for use with the @rtcio ecosystem"
 }

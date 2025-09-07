@@ -4,16 +4,22 @@
   "main": "src/index.ts",
   "private": true,
   "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "keywords": [
     "rtcio",
     "signaling",
     "RTC",
     "WebRTC",
-    "socket.io"
+    "socket.io",
+    "RTCPeerConnection",
+    "RTCDataChannel"
   ],
   "files": [
-    "../../LICENSE",
-    "dist"
+    "dist",
+    "package.json"
   ],
   "exports": {
     ".": "./dist/index.js"
