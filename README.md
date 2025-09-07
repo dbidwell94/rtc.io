@@ -1,5 +1,15 @@
 # rtcio
 
+<!--toc:start-->
+
+- [rtcio](#rtcio)
+  - [Features](#features)
+  - [Roadmap](#roadmap)
+  - [Usage/Examples](#usageexamples)
+  - [Testing](#testing)
+  - [API Documentation](#api-documentation)
+  <!--toc:end-->
+
 Inspired by socket.io, rtcio is an easier to use way of dealing with WebRTC.
 It wraps the logic of creating RTCPeerConnections in easy-to-use callback
 chaining.
@@ -125,5 +135,5 @@ await client1.connectToPeer(client2Id);
 
 ## API Documentation
 
-Api documentation is coming in the near future, implemented via `typedoc`,
+API documentation is coming in the near future, implemented via `typedoc`,
 and will be available on GitHub Pages once the integration is complete.

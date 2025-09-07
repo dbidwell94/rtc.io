@@ -1,7 +1,6 @@
 {
   "name": "@rtcio/socket-io-client",
   "version": "0.1.0",
-  "main": "src/index.ts",
   "private": true,
   "scripts": {},
   "repository": {
@@ -21,6 +20,8 @@
     "dist",
     "package.json"
   ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js"
   },

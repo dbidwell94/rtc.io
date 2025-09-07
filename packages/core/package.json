@@ -10,9 +10,6 @@
     "type": "git",
     "url": "https://github.com/dbidwell94/rtc.io"
   },
-  "exports": {
-    ".": "./dist/index.js"
-  },
   "keywords": [
     "WebRTC",
     "RTCPeerConnection",
@@ -25,7 +22,11 @@
     "message",
     "messaging"
   ],
-  "main": "dist/index.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {},
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
