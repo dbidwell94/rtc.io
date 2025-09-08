@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/signal-local",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/dbidwell94/rtc.io"
@@ -33,11 +33,12 @@
   "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
+    "@rtcio/logger": "workspace:*",
     "broadcast-channel": "^7.1.0",
-    "@rtcio/logger": "workspace:../logger"
+    "@dbidwell94/ts-utils": "^1.1.0"
   },
   "devDependencies": {
-    "wait-for-expect": "^4.0.0",
-    "@rtcio/signaling": "workspace:../signaling"
+    "@rtcio/signaling": "workspace:*",
+    "wait-for-expect": "^4.0.0"
   }
 }

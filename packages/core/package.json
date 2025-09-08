@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "files": [
     "dist",
@@ -36,12 +36,13 @@
   "license": "MIT",
   "devDependencies": {
     "@roamhq/wrtc": "^0.9.0",
-    "@rtcio/signal-local": "workspace:../signalLocalBrowser",
+    "@rtcio/signal-local": "workspace:*",
+    "@rtcio/signaling": "workspace:*",
     "@types/node": "^24.3.0",
-    "wait-for-expect": "^4.0.0",
-    "@rtcio/signaling": "workspace:../signaling"
+    "wait-for-expect": "^4.0.0"
   },
   "dependencies": {
-    "@rtcio/logger": "workspace:../logger"
+    "@dbidwell94/ts-utils": "^1.1.0",
+    "@rtcio/logger": "workspace:*"
   }
 }

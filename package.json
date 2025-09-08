@@ -33,7 +33,5 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.42.0"
   },
-  "dependencies": {
-    "@dbidwell94/ts-utils": "^1.1.0"
-  }
+  "dependencies": {}
 }

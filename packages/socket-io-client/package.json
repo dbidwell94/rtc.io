@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/socket-io-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "repository": {
     "type": "git",
@@ -32,8 +32,10 @@
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
-    "@rtcio/signaling": "workspace:../signaling",
-    "@rtcio/logger": "workspace:../logger",
-    "socket.io-client": "^4.8"
-  }
+    "@rtcio/logger": "workspace:*",
+    "@rtcio/signaling": "workspace:*",
+    "socket.io-client": "^4.8",
+    "@dbidwell94/ts-utils": "^1.1.0"
+  },
+  "devDependencies": {}
 }
