@@ -16,7 +16,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": {},
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",
@@ -24,6 +27,7 @@
     "@types/debug": "^4.1.12"
   },
   "dependencies": {
+    "colors": "^1.4.0",
     "debug": "^4.4.1"
   }
 }

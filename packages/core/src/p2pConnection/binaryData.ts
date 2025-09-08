@@ -212,7 +212,10 @@ export class BinaryChunker {
   }
 
   setDataIsStream(dataId: string): Result<ReadableStream<Uint8Array>> {
-    this.#logger.log("Marking data as a stream for dataId: {%s}", dataId);
+    this.#logger.log(
+      "Marking data as a stream for dataId: {%s}",
+      dataId.substring(0, 8),
+    );
     const timeoutHandler = () => {
       const optData = option.unknown(this._streams.get(dataId));
       if (optData.isNone()) return;

@@ -2,7 +2,6 @@
   "name": "@rtcio/socket-io-server",
   "version": "0.1.0",
   "private": true,
-  "scripts": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/dbidwell94/rtc.io"
@@ -25,6 +24,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",

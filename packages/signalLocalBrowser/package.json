@@ -1,7 +1,6 @@
 {
   "name": "@rtcio/signal-local",
   "version": "0.1.0",
-  "scripts": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/dbidwell94/rtc.io"
@@ -15,6 +14,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
   "keywords": [
     "rtcio",
     "signal",
@@ -34,6 +37,7 @@
     "@rtcio/logger": "workspace:../logger"
   },
   "devDependencies": {
-    "wait-for-expect": "^4.0.0"
+    "wait-for-expect": "^4.0.0",
+    "@rtcio/signaling": "workspace:../signaling"
   }
 }
