@@ -32,12 +32,12 @@
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
-    "@rtcio/logger": "workspace:../logger",
-    "@rtcio/signaling": "workspace:../signaling",
-    "socket.io": "^4.8"
+    "@rtcio/logger": "workspace:*",
+    "@rtcio/signaling": "workspace:*",
+    "socket.io": "^4.8",
+    "@dbidwell94/ts-utils": "^1.1.0"
   },
   "devDependencies": {
-    "@dbidwell94/ts-utils": "^1.1.0",
-    "@rtcio/socket-io-client": "workspace:../socket-io-client"
+    "@rtcio/socket-io-client": "workspace:*"
   }
 }

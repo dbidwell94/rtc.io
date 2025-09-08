@@ -47,21 +47,21 @@ importers:
 
   packages/core:
     dependencies:
-      '@rtcio/logger':
-        specifier: workspace:../logger
-        version: link:../logger
-    devDependencies:
       '@dbidwell94/ts-utils':
         specifier: ^1.1.0
         version: 1.1.0
+      '@rtcio/logger':
+        specifier: workspace:*
+        version: link:../logger
+    devDependencies:
       '@roamhq/wrtc':
         specifier: ^0.9.0
         version: 0.9.0
       '@rtcio/signal-local':
-        specifier: workspace:../signalLocalBrowser
+        specifier: workspace:*
         version: link:../signalLocalBrowser
       '@rtcio/signaling':
-        specifier: workspace:../signaling
+        specifier: workspace:*
         version: link:../signaling
       '@types/node':
         specifier: ^24.3.0
@@ -85,18 +85,18 @@ importers:
 
   packages/signalLocalBrowser:
     dependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@rtcio/logger':
-        specifier: workspace:../logger
+        specifier: workspace:*
         version: link:../logger
       broadcast-channel:
         specifier: ^7.1.0
         version: 7.1.0
     devDependencies:
-      '@dbidwell94/ts-utils':
-        specifier: ^1.1.0
-        version: 1.1.0
       '@rtcio/signaling':
-        specifier: workspace:../signaling
+        specifier: workspace:*
         version: link:../signaling
       wait-for-expect:
         specifier: ^4.0.0
@@ -110,37 +110,36 @@ importers:
 
   packages/socket-io-client:
     dependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@rtcio/logger':
-        specifier: workspace:../logger
+        specifier: workspace:*
         version: link:../logger
       '@rtcio/signaling':
-        specifier: workspace:../signaling
+        specifier: workspace:*
         version: link:../signaling
       socket.io-client:
         specifier: ^4.8
         version: 4.8.1
-    devDependencies:
-      '@dbidwell94/ts-utils':
-        specifier: ^1.1.0
-        version: 1.1.0
 
   packages/socket-io-server:
     dependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@rtcio/logger':
-        specifier: workspace:../logger
+        specifier: workspace:*
         version: link:../logger
       '@rtcio/signaling':
-        specifier: workspace:../signaling
+        specifier: workspace:*
         version: link:../signaling
       socket.io:
         specifier: ^4.8
         version: 4.8.1
     devDependencies:
-      '@dbidwell94/ts-utils':
-        specifier: ^1.1.0
-        version: 1.1.0
       '@rtcio/socket-io-client':
-        specifier: workspace:../socket-io-client
+        specifier: workspace:*
         version: link:../socket-io-client
 
 packages:
