@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@dbidwell94/ts-utils':
-        specifier: ^1.1.0
-        version: 1.1.0
     devDependencies:
       '@changesets/cli':
         specifier: ^2.29.6
@@ -55,6 +51,9 @@ importers:
         specifier: workspace:../logger
         version: link:../logger
     devDependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@roamhq/wrtc':
         specifier: ^0.9.0
         version: 0.9.0
@@ -93,6 +92,9 @@ importers:
         specifier: ^7.1.0
         version: 7.1.0
     devDependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@rtcio/signaling':
         specifier: workspace:../signaling
         version: link:../signaling
@@ -100,7 +102,11 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0
 
-  packages/signaling: {}
+  packages/signaling:
+    devDependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
 
   packages/socket-io-client:
     dependencies:
@@ -113,6 +119,10 @@ importers:
       socket.io-client:
         specifier: ^4.8
         version: 4.8.1
+    devDependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
 
   packages/socket-io-server:
     dependencies:
@@ -126,6 +136,9 @@ importers:
         specifier: ^4.8
         version: 4.8.1
     devDependencies:
+      '@dbidwell94/ts-utils':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@rtcio/socket-io-client':
         specifier: workspace:../socket-io-client
         version: link:../socket-io-client

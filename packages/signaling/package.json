@@ -30,5 +30,8 @@
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
-  "description": "A types only package for use in creating custom signaling for use with the @rtcio ecosystem"
+  "description": "A types only package for use in creating custom signaling for use with the @rtcio ecosystem",
+  "devDependencies": {
+    "@dbidwell94/ts-utils": "^1.1.0"
+  }
 }

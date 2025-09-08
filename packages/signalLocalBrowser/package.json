@@ -33,11 +33,12 @@
   "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
-    "broadcast-channel": "^7.1.0",
-    "@rtcio/logger": "workspace:../logger"
+    "@rtcio/logger": "workspace:../logger",
+    "broadcast-channel": "^7.1.0"
   },
   "devDependencies": {
-    "wait-for-expect": "^4.0.0",
-    "@rtcio/signaling": "workspace:../signaling"
+    "@dbidwell94/ts-utils": "^1.1.0",
+    "@rtcio/signaling": "workspace:../signaling",
+    "wait-for-expect": "^4.0.0"
   }
 }
