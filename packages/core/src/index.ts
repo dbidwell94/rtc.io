@@ -1,7 +1,14 @@
-export { RTC, type InternalEvents as RTCInternalEvents } from "./manager";
+export {
+  RTC,
+  type InternalEvents as RTCInternalEvents,
+  type RtcOptions,
+  type RemoteOffer,
+} from "./manager";
 export {
   type P2PConnection,
-  type VoidMethods,
   type EventMap as P2PConnectionEventMap,
+  type InternalEvents as P2PInternalEvents,
+  type FileMetadata,
 } from "./p2pConnection";
 export { type PeerId } from "@rtcio/signaling";
+export { result, option, type Option, type Result } from "@dbidwell94/ts-utils";
