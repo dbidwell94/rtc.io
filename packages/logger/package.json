@@ -28,6 +28,6 @@
   },
   "dependencies": {
     "colors": "^1.4.0",
-    "debug": "^4.4.1"
+    "debug": "4.4.0"
   }
 }
