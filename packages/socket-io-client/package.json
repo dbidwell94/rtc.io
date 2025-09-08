@@ -1,28 +1,39 @@
 {
   "name": "@rtcio/socket-io-client",
   "version": "0.1.0",
-  "main": "src/index.ts",
-  "scripts": {},
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "keywords": [
     "rtcio",
     "signaling",
     "RTC",
     "WebRTC",
-    "socket.io"
+    "socket.io",
+    "RTCPeerConnection",
+    "RTCDataChannel"
   ],
   "files": [
-    "../../LICENSE",
-    "dist"
+    "dist",
+    "package.json"
   ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
-    "@rtcio/signaling": "file:../signaling",
-    "@rtcio/logger": "file:../logger",
+    "@rtcio/signaling": "workspace:../signaling",
+    "@rtcio/logger": "workspace:../logger",
     "socket.io-client": "^4.8"
   }
 }

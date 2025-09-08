@@ -4,32 +4,44 @@
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "files": [
     "dist",
-    "../../LICENSE",
-    "package.json",
-    "README.md"
+    "package.json"
   ],
-  "exports": {
-    ".": "./dist/index.js"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
   },
   "keywords": [
     "WebRTC",
     "RTCPeerConnection",
     "P2P",
-    "rtcio"
+    "rtcio",
+    "RTCDataChannel",
+    "file",
+    "streaming",
+    "binary",
+    "message",
+    "messaging"
   ],
-  "main": "dist/index.ts",
-  "scripts": {},
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",
   "devDependencies": {
     "@roamhq/wrtc": "^0.9.0",
-    "@rtcio/signal-local": "file:../signalLocalBrowser",
+    "@rtcio/signal-local": "workspace:../signalLocalBrowser",
     "@types/node": "^24.3.0",
     "wait-for-expect": "^4.0.0",
-    "@rtcio/signaling": "file:../signaling"
+    "@rtcio/signaling": "workspace:../signaling"
   },
   "dependencies": {
-    "@rtcio/logging": "file:../logger"
+    "@rtcio/logger": "workspace:../logger"
   }
 }

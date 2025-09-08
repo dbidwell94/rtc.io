@@ -1,28 +1,43 @@
 {
   "name": "@rtcio/signal-local",
   "version": "0.1.0",
-  "main": "src/index.ts",
-  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "files": [
     "dist",
-    "../../LICENSE"
+    "package.json"
   ],
   "exports": {
     ".": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
   },
   "keywords": [
     "rtcio",
     "signal",
     "signal server",
-    "local"
+    "server",
+    "local",
+    "testing",
+    "development",
+    "webrtc",
+    "p2p"
   ],
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
   "description": "A local only rtcio signal 'server'.",
   "dependencies": {
-    "broadcast-channel": "^7.1.0"
+    "broadcast-channel": "^7.1.0",
+    "@rtcio/logger": "workspace:../logger"
   },
   "devDependencies": {
-    "wait-for-expect": "^4.0.0"
+    "wait-for-expect": "^4.0.0",
+    "@rtcio/signaling": "workspace:../signaling"
   }
 }

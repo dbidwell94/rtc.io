@@ -2,23 +2,24 @@
   "name": "@rtcio/logger",
   "version": "0.1.0",
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
   "files": [
     "dist",
-    "../../LICENSE",
     "package.json"
   ],
+  "keywords": [],
   "exports": {
     ".": "./dist/index.js"
   },
-  "keywords": [
-    "WebRTC",
-    "RTCPeerConnection",
-    "P2P",
-    "rtcio"
-  ],
-  "main": "dist/index.ts",
-  "scripts": {},
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
   "author": "Devin Bidwell",
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",
@@ -26,6 +27,7 @@
     "@types/debug": "^4.1.12"
   },
   "dependencies": {
+    "colors": "^1.4.0",
     "debug": "^4.4.1"
   }
 }

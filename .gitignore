@@ -91,6 +91,7 @@ out
 .nuxt
 dist
 docs
+.turbo
 
 # Gatsby files
 .cache/
