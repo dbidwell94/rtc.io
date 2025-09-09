@@ -33,6 +33,6 @@
   "license": "MIT",
   "description": "A types only package for use in creating custom signaling for use with the @rtcio ecosystem",
   "devDependencies": {
-    "@dbidwell94/ts-utils": "^1.1.0"
+    "@dbidwell94/ts-utils": "^1.2.0"
   }
 }
