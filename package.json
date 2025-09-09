@@ -15,7 +15,7 @@
     "test": "tsc --noEmit && jest --forceExit",
     "doc": "typedoc",
     "build": "turbo build check-types",
-    "dev": "turbo dev",
+    "dev": "turbo watch dev",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "ci:publish": "pnpm build && pnpm publish -r --dry-run"
   },
