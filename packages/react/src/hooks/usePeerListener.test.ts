@@ -1,7 +1,7 @@
 import { act, waitFor } from "@testing-library/react";
 import { renderHook } from "../testUtils/renderHook";
 import { createUsePeerListener } from "./usePeerListener";
-import { createTypedUseRtcListener } from "./useRtcListener";
+import { createUseRtcListener } from "./useRtcListener";
 import { usePeerContext } from "./usePeerContext";
 
 describe("src/hooks/usePeerListener.ts", () => {
@@ -9,7 +9,7 @@ describe("src/hooks/usePeerListener.ts", () => {
     const sub1 = jest.fn();
     const sub2 = jest.fn();
     const usePeerListener = createUsePeerListener();
-    const useRtcListener = createTypedUseRtcListener();
+    const useRtcListener = createUseRtcListener();
     const roomName = crypto.randomUUID();
 
     const { result: res1 } = renderHook(roomName, () => ({
@@ -60,7 +60,7 @@ describe("src/hooks/usePeerListener.ts", () => {
     }
 
     const usePeerListener = createUsePeerListener<Events>();
-    const useRtcListener = createTypedUseRtcListener<Events>();
+    const useRtcListener = createUseRtcListener<Events>();
 
     const { result: res1 } = renderHook(roomName, () => ({
       listener: usePeerListener("custom", fired),
@@ -104,7 +104,7 @@ describe("src/hooks/usePeerListener.ts", () => {
     }
 
     const usePeerListener = createUsePeerListener<Events>();
-    const useRtcListener = createTypedUseRtcListener<Events>();
+    const useRtcListener = createUseRtcListener<Events>();
 
     const { result: res1, rerender: rerender1 } = renderHook(
       roomName,
@@ -162,6 +162,63 @@ describe("src/hooks/usePeerListener.ts", () => {
       expect(
         Array.from(res1.current.context.peers.current.values()).every(
           (peer) => peer["_events"]["custom2"].size === 1,
+        ),
+      );
+    });
+  });
+
+  it("Automatically subscribes new peers to the specified event", async () => {
+    const roomName = crypto.randomUUID();
+
+    const usePeerListener = createUsePeerListener();
+    const useRtcListener = createUseRtcListener();
+
+    const { result: res1 } = renderHook(roomName, () => ({
+      rtc: usePeerContext(),
+      peerHandler: usePeerListener("error", () => {}),
+      rtcHandler: useRtcListener("connectionRequest", (req) => req.accept()),
+    }));
+    const { result: res2 } = renderHook(roomName, () => ({
+      rtc: usePeerContext(),
+      peerHandler: usePeerListener("error", () => {}),
+      rtcHander: useRtcListener("connectionRequest", (req) => req.accept()),
+    }));
+
+    await waitFor(() => {
+      expect(res1.current.rtc.rtc.isSome()).toBeTruthy();
+      expect(res2.current.rtc.rtc.isSome()).toBeTruthy();
+    });
+
+    res1.current.rtc.rtc
+      .unwrap()
+      .rtc.connectToPeer(res2.current.rtc.rtc.unwrap().myId);
+
+    await waitFor(() => {
+      expect(res1.current.rtc.peerIds).toHaveLength(1);
+      expect(
+        Array.from(res1.current.rtc.peers.current.values()).every(
+          (val) => val["_events"]["error"].size === 1,
+        ),
+      );
+    });
+
+    const { result: res3 } = renderHook(roomName, () => ({
+      rtc: usePeerContext(),
+    }));
+
+    await waitFor(() => {
+      expect(res3.current.rtc.rtc.isSome()).toBeTruthy();
+    });
+
+    res3.current.rtc.rtc
+      .unwrap()
+      .rtc.connectToPeer(res1.current.rtc.rtc.unwrap().myId);
+
+    await waitFor(() => {
+      expect(res1.current.rtc.peerIds).toHaveLength(2);
+      expect(
+        Array.from(res1.current.rtc.peers.current.values()).every(
+          (val) => val["_events"]["error"].size === 1,
         ),
       );
     });
