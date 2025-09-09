@@ -12,7 +12,7 @@
     "target": "ES2021",
     "module": "commonjs",
     "moduleResolution": "node",
-    "removeComments": true,
+    // "removeComments": true,
     "rootDir": ".",
     "lib": ["DOM", "DOM.Iterable", "ES2022"]
   },

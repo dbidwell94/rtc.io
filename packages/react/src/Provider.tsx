@@ -5,7 +5,15 @@ import {
   RtcOptions,
   VoidMethods,
 } from "@rtcio/core";
-import { createContext, ReactNode, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Option, option } from "@dbidwell94/ts-utils";
 
 export interface P2PContext<
@@ -13,13 +21,14 @@ export interface P2PContext<
 > {
   rtc: Option<{ rtc: RTC<TEvents>; myId: PeerId }>;
   peerIds: PeerId[];
+  peers: RefObject<Map<PeerId, P2PConnection<TEvents>>>;
 }
 
 export interface P2PProps extends RtcOptions {
   children?: ReactNode;
 }
 
-const p2pContext = createContext<P2PContext>(null as never);
+export const p2pContext = createContext<P2PContext>(null as never);
 
 export default function P2PProvider<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
@@ -31,6 +40,11 @@ export default function P2PProvider<
   iceServers,
   maxChunkSizeBytes,
 }: P2PProps) {
+  const memoSignaler = useMemo(() => signaler, []);
+  const memoIce = useMemo(() => iceServers, []);
+  const memoDataTimeout = useMemo(() => dataTimeoutMs, []);
+  const memoDataSize = useMemo(() => maxChunkSizeBytes, []);
+
   const peers = useRef(new Map<PeerId, P2PConnection<TEvents>>());
 
   const [peerIds, setPeerIds] = useState<PeerId[]>([]);
@@ -42,10 +56,10 @@ export default function P2PProvider<
   useEffect(() => {
     const rtcInstance = new RTC<TEvents>({
       roomName,
-      signaler,
-      dataTimeoutMs,
-      iceServers,
-      maxChunkSizeBytes,
+      signaler: memoSignaler,
+      dataTimeoutMs: memoDataTimeout,
+      iceServers: memoIce,
+      maxChunkSizeBytes: memoDataSize,
     });
 
     rtcInstance.connectToRoom().then((res) => {
@@ -67,14 +81,12 @@ export default function P2PProvider<
     });
 
     return () => {
-      rtc.inspect(async ({ rtc: instance }) => {
-        await instance.close();
-      });
+      rtcInstance.close();
     };
-  }, [roomName, signaler, dataTimeoutMs, iceServers, maxChunkSizeBytes]);
+  }, [roomName]);
 
   return (
-    <p2pContext.Provider value={{ rtc, peerIds }}>
+    <p2pContext.Provider value={{ rtc, peerIds, peers }}>
       {children}
     </p2pContext.Provider>
   );
