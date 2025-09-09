@@ -1,7 +1,7 @@
 {
-  "name": "@rtcio/core",
-  "version": "0.1.2",
-  "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
+  "name": "@rtcio/react",
+  "version": "0.1.0",
+  "description": "A wrapper around the @rtcio/core library for React integration",
   "files": [
     "dist",
     "package.json"
@@ -20,7 +20,8 @@
     "streaming",
     "binary",
     "message",
-    "messaging"
+    "messaging",
+    "react"
   ],
   "exports": {
     ".": "./dist/index.js"
@@ -36,14 +37,14 @@
   "email": "dbidwell94@biddydev.com",
   "license": "MIT",
   "devDependencies": {
-    "@roamhq/wrtc": "^0.9.0",
-    "@rtcio/signal-local": "workspace:*",
-    "@rtcio/signaling": "workspace:*",
-    "@types/node": "^24.3.0",
-    "wait-for-expect": "^4.0.0"
+    "react": "^19",
+    "@types/react": "^19"
   },
   "dependencies": {
-    "@dbidwell94/ts-utils": "^1.1.0",
-    "@rtcio/logger": "workspace:*"
+    "@rtcio/core": "workspace:*",
+    "@dbidwell94/ts-utils": "^1.2"
+  },
+  "peerDependencies": {
+    "react": "^17 || ^18 || ^19"
   }
 }

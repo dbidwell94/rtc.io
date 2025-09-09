@@ -26,6 +26,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "check-types": "tsc --noEmit"
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",

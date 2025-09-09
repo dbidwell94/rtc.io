@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "dev": {
+      "outputs": ["dist/**"],
+      "cache": false
+    },
     "check-types": {
       "dependsOn": ["^check-types"]
     }

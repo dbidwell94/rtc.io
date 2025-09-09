@@ -15,7 +15,7 @@
     "test": "tsc --noEmit && jest --forceExit",
     "doc": "typedoc",
     "build": "turbo build check-types",
-    "dev": "turbo watch build",
+    "dev": "turbo dev",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "ci:publish": "pnpm build && pnpm publish -r --dry-run"
   },
@@ -25,6 +25,7 @@
     "@roamhq/wrtc": "^0.9.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.3.1",
+    "eslint": "^9.35.0",
     "jest": "^30.1.3",
     "jest-environment-jsdom": "^30.1.2",
     "ts-jest": "^29.4.1",
@@ -35,6 +36,5 @@
   },
   "overrides": {
     "debug": "4.4.0"
-  },
-  "dependencies": {}
+  }
 }
