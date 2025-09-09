@@ -1,12 +1,12 @@
 import { renderHook } from "../testUtils/renderHook";
-import { createTypedUseRtcListener } from "./useRtcListener";
+import { createUseRtcListener } from "./useRtcListener";
 import { usePeerContext } from "./usePeerContext";
 import { act, waitFor } from "@testing-library/react";
 import { RTCInternalEvents } from "@rtcio/core";
 
 describe("src/hooks/useRtcListener.ts", () => {
   it("Subscribes to RTC events", async () => {
-    const useRtcListener = createTypedUseRtcListener();
+    const useRtcListener = createUseRtcListener();
     const roomName = crypto.randomUUID();
 
     const { result } = renderHook(roomName, () => ({
@@ -27,7 +27,7 @@ describe("src/hooks/useRtcListener.ts", () => {
   });
 
   it("Unsubscribed from RTC events", async () => {
-    const useRtcListener = createTypedUseRtcListener();
+    const useRtcListener = createUseRtcListener();
     const roomName = crypto.randomUUID();
 
     const { rerender, result } = renderHook(

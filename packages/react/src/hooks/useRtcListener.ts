@@ -2,7 +2,7 @@ import { RTCInternalEvents, VoidMethods } from "@rtcio/core";
 import { useContext, useEffect, useRef } from "react";
 import { P2PContext, p2pContext } from "../Provider";
 
-export function createTypedUseRtcListener<
+export function createUseRtcListener<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
 >() {
   return function useRtcListener<TKey extends keyof RTCInternalEvents<TEvents>>(
