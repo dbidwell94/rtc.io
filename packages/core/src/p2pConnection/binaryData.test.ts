@@ -1,6 +1,7 @@
 import { FileMetadata } from ".";
 import { BinaryChunker, JsonObject } from "./binaryData";
 import waitFor from "wait-for-expect";
+import { describe, it, vitest, expect, afterEach } from "vitest";
 
 async function collectGeneratorValues<T>(
   generator: AsyncGenerator<T>,
@@ -15,11 +16,11 @@ async function collectGeneratorValues<T>(
 
 describe("src/p2pConnection/binaryData.ts", () => {
   afterEach(() => {
-    jest.useRealTimers();
+    vitest.useRealTimers();
   });
   it("Throws an error if you try to create an instance with too low a chunk size", () => {
     expect(
-      () => new BinaryChunker({ onDataTimeout: jest.fn(), maxChunkSize: 1 }),
+      () => new BinaryChunker({ onDataTimeout: vitest.fn(), maxChunkSize: 1 }),
     ).toThrow();
   });
 
@@ -27,7 +28,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     expect(
       () =>
         new BinaryChunker({
-          onDataTimeout: jest.fn(),
+          onDataTimeout: vitest.fn(),
           maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
         }),
     ).not.toThrow();
@@ -36,7 +37,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
   it("Returns the correct amount of chunks", async () => {
     const binaryData = new Uint8Array([1, 2, 3, 4, 5, 6]).buffer;
     const chunker = new BinaryChunker({
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
     const data = await collectGeneratorValues(chunker.chunkData(binaryData));
@@ -49,7 +50,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
   it("Sets headers on the chunks as expected", async () => {
     const binaryData = new Uint8Array([1, 2]).buffer;
     const chunker = new BinaryChunker({
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
@@ -91,7 +92,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
   ])(
     "Should be an expected size of %s bytes",
     async (expectedBufferSize, buffer) => {
-      const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+      const chunker = new BinaryChunker({ onDataTimeout: vitest.fn() });
       const [, data] = await collectGeneratorValues(chunker.chunkData(buffer));
 
       expect(data.byteLength).toEqual(expectedBufferSize);
@@ -102,7 +103,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const expectedMetadata = { testKey: "testValue" };
     const encoded = new TextEncoder().encode(JSON.stringify(expectedMetadata));
 
-    const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+    const chunker = new BinaryChunker({ onDataTimeout: vitest.fn() });
     const [metadata] = await collectGeneratorValues(
       chunker.chunkData(new Uint8Array([1, 2, 3, 4, 5]).buffer, {
         testKey: "testValue",
@@ -121,7 +122,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const data = new Uint8Array([1, 2, 3, 4, 5]);
 
     const chunker = new BinaryChunker({
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
@@ -150,7 +151,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
       item1: string;
     }
     const data = new Uint8Array([1, 2, 3, 4, 5]);
-    const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+    const chunker = new BinaryChunker({ onDataTimeout: vitest.fn() });
 
     const metadata: Metadata = {
       item1: "Hello, World!",
@@ -187,7 +188,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const expectedData = new Uint8Array([1, 2, 3, 4, 5]);
 
     const chunker = new BinaryChunker({
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
     });
 
@@ -217,8 +218,8 @@ describe("src/p2pConnection/binaryData.ts", () => {
   });
 
   it("Removes data from memory if packets are not received within the dataTimeoutMs", async () => {
-    jest.useFakeTimers();
-    const dataTimeoutCallback = jest.fn();
+    vitest.useFakeTimers();
+    const dataTimeoutCallback = vitest.fn();
     const timeout = 100;
 
     const data = new Uint8Array([1, 2, 3, 4, 5]);
@@ -236,17 +237,17 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const id = chunker["parseHeaderFromBuffer"](chunk1).id;
 
     expect(chunker.receiveChunk(chunk1).data.isNone()).toBeTruthy();
-    jest.advanceTimersByTime(timeout - 1);
+    vitest.advanceTimersByTime(timeout - 1);
     expect(dataTimeoutCallback).not.toHaveBeenCalled();
     expect(chunker["_chunks"].size).toEqual(1);
 
     expect(chunker.receiveChunk(chunk2).data.isNone()).toBeTruthy();
     // A new chunk was received. This should reset the timeout.
-    jest.advanceTimersByTime(timeout - 1);
+    vitest.advanceTimersByTime(timeout - 1);
     expect(dataTimeoutCallback).not.toHaveBeenCalled();
 
     expect(chunker.receiveChunk(chunk3).data.isNone()).toBeTruthy();
-    jest.advanceTimersByTime(timeout);
+    vitest.advanceTimersByTime(timeout);
     expect(dataTimeoutCallback).toHaveBeenCalledTimes(1);
     expect(dataTimeoutCallback).toHaveBeenCalledWith(id);
 
@@ -259,7 +260,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
     const expected1 = new Uint8Array([6, 7, 8, 9, 0]);
     const expected2 = new Uint8Array([1, 2, 3, 4, 5]);
 
-    const chunker = new BinaryChunker({ onDataTimeout: jest.fn() });
+    const chunker = new BinaryChunker({ onDataTimeout: vitest.fn() });
 
     const chunks1 = await collectGeneratorValues(
       chunker.chunkData(expected1.buffer),
@@ -306,7 +307,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const chunker = new BinaryChunker({
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
     });
 
     const chunks = await collectGeneratorValues(
@@ -352,7 +353,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
   });
 
   it("Can reassemble a stream if chunks are sent out of order", async () => {
-    const onTimeout = jest.fn();
+    const onTimeout = vitest.fn();
     const fileData = new Uint8Array([1, 2, 3, 4, 5, 6]);
 
     const metadata: FileMetadata = {
@@ -425,7 +426,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const chunker = new BinaryChunker({
       maxChunkSize: BinaryChunker.HEADER_SIZE + 1,
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
     });
 
     const chunks: ArrayBuffer[] = [];
@@ -464,7 +465,7 @@ describe("src/p2pConnection/binaryData.ts", () => {
 
     const chunker = new BinaryChunker({
       maxChunkSize: BinaryChunker.HEADER_SIZE + 2,
-      onDataTimeout: jest.fn(),
+      onDataTimeout: vitest.fn(),
     });
 
     const chunks: ArrayBuffer[] = [];

@@ -3,6 +3,7 @@ import { createUseRtcListener } from "./useRtcListener";
 import { usePeerContext } from "./usePeerContext";
 import { act, waitFor } from "@testing-library/react";
 import { RTCInternalEvents } from "@rtcio/core";
+import { describe, it, vitest, expect } from "vitest";
 
 describe("src/hooks/useRtcListener.ts", () => {
   it("Subscribes to RTC events", async () => {
@@ -10,7 +11,7 @@ describe("src/hooks/useRtcListener.ts", () => {
     const roomName = crypto.randomUUID();
 
     const { result } = renderHook(roomName, () => ({
-      sub: useRtcListener("connectionRequest", jest.fn()),
+      sub: useRtcListener("connectionRequest", vitest.fn()),
       rtc: usePeerContext(),
     }));
 
@@ -33,7 +34,7 @@ describe("src/hooks/useRtcListener.ts", () => {
     const { rerender, result } = renderHook(
       roomName,
       ({ eventName }) => ({
-        sub: useRtcListener(eventName, jest.fn()),
+        sub: useRtcListener(eventName, vitest.fn()),
         rtc: usePeerContext(),
       }),
       {

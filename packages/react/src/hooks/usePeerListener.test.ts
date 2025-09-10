@@ -4,6 +4,7 @@ import { createUsePeerListener } from "./usePeerListener";
 import { createUseRtcListener } from "./useRtcListener";
 import { usePeerContext } from "./usePeerContext";
 import { P2PConnectionEventMap, VoidMethods } from "@rtcio/core";
+import { describe, it, vitest, expect } from "vitest";
 
 function createUseRtcSuite<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
@@ -30,8 +31,8 @@ function createUseRtcSuite<
 describe("src/hooks/usePeerListener.ts", () => {
   it("Subscribes to events as peers come in", async () => {
     const useRtcSuite = createUseRtcSuite();
-    const sub1 = jest.fn();
-    const sub2 = jest.fn();
+    const sub1 = vitest.fn();
+    const sub2 = vitest.fn();
     const roomName = crypto.randomUUID();
 
     const { result: res1 } = renderHook(roomName, () =>
@@ -72,7 +73,7 @@ describe("src/hooks/usePeerListener.ts", () => {
 
   it("Fires callbacks for custom events", async () => {
     const roomName = crypto.randomUUID();
-    const fired = jest.fn();
+    const fired = vitest.fn();
     const expectedMessage = "TEST_MESSAGE";
     interface Events {
       custom: (message: string) => void;

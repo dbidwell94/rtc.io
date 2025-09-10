@@ -4,6 +4,7 @@ import { createUseRtcListener } from "./useRtcListener";
 import { usePeerContext } from "./usePeerContext";
 import { renderHook } from "../testUtils/renderHook";
 import { act, waitFor } from "@testing-library/react";
+import { describe, it, vitest, expect } from "vitest";
 
 function useRtcSuite<TEvents extends VoidMethods<TEvents>>() {
   const usePeerEmitter = createUsePeerEmitter<TEvents>();
@@ -23,7 +24,7 @@ function useRtcSuite<TEvents extends VoidMethods<TEvents>>() {
 
 describe("src/hooks/usePeerEmitter.ts", () => {
   it("Emits events to the correct peer", async () => {
-    const fired = jest.fn();
+    const fired = vitest.fn();
     const customMessage = "HELLO WORLD";
     interface Events {
       custom: (message: string) => void;
@@ -91,7 +92,7 @@ describe("src/hooks/usePeerEmitter.ts", () => {
       expect(res2.current.peerIds).toHaveLength(1);
     });
 
-    expect(async () =>
+    await expect(async () =>
       (await res1.current.emitEvent("NOPE", "custom")).unwrap(),
     ).rejects.toBeInstanceOf(Error);
   });

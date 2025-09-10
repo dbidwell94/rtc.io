@@ -2,6 +2,7 @@ import waitFor from "wait-for-expect";
 import { RTC } from "./manager";
 import LocalSignal from "@rtcio/signal-local";
 import { PeerId } from "@rtcio/signaling";
+import { describe, it, vitest, expect, beforeEach } from "vitest";
 
 let signal1: LocalSignal;
 let signal2: LocalSignal;
@@ -27,8 +28,8 @@ describe("src/manager.ts", () => {
   });
 
   it("Connects 2 peers together", async () => {
-    const firstConnected = jest.fn();
-    const secondConnected = jest.fn();
+    const firstConnected = vitest.fn();
+    const secondConnected = vitest.fn();
     const p2p1 = new RTC({ signaler: signal1, roomName: ROOM_NAME });
     p2p1.on("connected", firstConnected);
 
@@ -59,7 +60,7 @@ describe("src/manager.ts", () => {
       message: (messageText: string) => void;
     }
 
-    const onP2p1Message = jest.fn();
+    const onP2p1Message = vitest.fn();
 
     const p2p1 = new RTC<TestInterface>({
       signaler: signal1,

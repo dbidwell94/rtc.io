@@ -12,13 +12,14 @@
     "target": "ES2021",
     "module": "esnext",
     "moduleResolution": "bundler",
-    // "removeComments": true,
     "rootDir": ".",
-    "lib": ["DOM", "DOM.Iterable", "ES2022"]
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["vitest/globals"]
   },
   "files": [],
   "exclude": ["./jest.setup.js"],
   "references": [
+    { "path": "./packages/react" },
     { "path": "./packages/logger" },
     { "path": "./packages/core" },
     { "path": "./packages/signalLocalBrowser" },

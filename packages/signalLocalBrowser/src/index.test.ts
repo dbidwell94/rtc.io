@@ -1,3 +1,4 @@
+import { describe, beforeEach, it, vitest, expect } from "vitest";
 import waitFor from "wait-for-expect";
 import LocalSignalServer from "./index";
 import { PeerId } from "@rtcio/signaling";
@@ -19,7 +20,7 @@ describe("src/index.ts", () => {
   });
 
   it("Passes rejected event to the correct peer", async () => {
-    const rejected = jest.fn();
+    const rejected = vitest.fn();
 
     peer2.on("connectionRejected", rejected);
     peer1.rejectOffer(peer2Id);
@@ -31,7 +32,7 @@ describe("src/index.ts", () => {
   });
 
   it("Passes offers to the correct peer", async () => {
-    const onOffer = jest.fn();
+    const onOffer = vitest.fn();
 
     peer2.on("offer", onOffer);
     peer1.sendOffer(peer2Id, {} as never);
@@ -43,7 +44,7 @@ describe("src/index.ts", () => {
   });
 
   it("Passes answer to the correct peer", async () => {
-    const onAnswer = jest.fn();
+    const onAnswer = vitest.fn();
 
     peer2.on("answer", onAnswer);
     peer1.sendAnswer(peer2Id, {} as never);
@@ -55,7 +56,7 @@ describe("src/index.ts", () => {
   });
 
   it("Passes ICE Candidates to the correct peer", async () => {
-    const onIce = jest.fn();
+    const onIce = vitest.fn();
 
     peer2.on("iceCandidate", onIce);
     peer1.sendIceCandidate(peer2Id, {} as never);
@@ -67,7 +68,7 @@ describe("src/index.ts", () => {
   });
 
   it("Removes event handlers", async () => {
-    const onEvent = jest.fn();
+    const onEvent = vitest.fn();
 
     peer2.on("iceCandidate", onEvent);
     peer1.sendIceCandidate(peer2Id, {} as never);
