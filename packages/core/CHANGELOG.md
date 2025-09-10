@@ -1,5 +1,14 @@
 # @rtcio/core
 
+## 0.1.3
+
+### Patch Changes
+
+- 384bbd4: Fixed typescript build chain to output ESNext instead of commonjs
+- Updated dependencies [dc60668]
+- Updated dependencies [384bbd4]
+  - @rtcio/logger@0.1.2
+
 ## 0.1.2
 
 ### Patch Changes
