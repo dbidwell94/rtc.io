@@ -7,6 +7,7 @@
 
 import { Option, option, result, Result } from "@dbidwell94/ts-utils";
 import Logger from "@rtcio/logger";
+import { v4 } from "uuid";
 
 /**
  * Represents any valid JSON-serializable primitive value.
@@ -127,7 +128,7 @@ export class BinaryChunker {
     metadata?: T,
   ): AsyncGenerator<ArrayBuffer> {
     this.#logger.verbose("streamData");
-    const dataId = crypto.randomUUID();
+    const dataId = v4() as ReturnType<typeof crypto.randomUUID>;
     this.#logger.log(
       "Streaming data for dataId {%s} with max chunk size of %d bytes",
       dataId.substring(0, 8),

@@ -118,7 +118,7 @@ export class P2PConnection<
   }: P2POptions) {
     this.#logger = new Logger(
       "rtcio:core",
-      P2PConnection.name,
+      "P2PConnection",
       peerId.substring(0, 8),
     );
 
@@ -175,6 +175,7 @@ export class P2PConnection<
         connection.connectionState,
       );
       switch (connection.connectionState) {
+        case "failed":
         case "closed": {
           await this.close();
           break;

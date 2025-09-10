@@ -1,7 +1,8 @@
-import { P2PConnection, type VoidMethods } from "./p2pConnection";
+import { MaybePromise, P2PConnection, type VoidMethods } from "./p2pConnection";
 import { type ClientSignaler, type PeerId } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 import Logger from "@rtcio/logger";
+import { v4 } from "uuid";
 
 const DATA_CHANNEL_GENERIC = "generic";
 const DATA_CHANNEL_BINARY = "binary";
@@ -72,6 +73,15 @@ export interface InternalEvents<
    * `RTC` events.
    */
   error: (error: Error) => void;
+
+  /**
+   * Fires whenever a new peer connects to the specified room of the
+   * Signal Server.
+   *
+   * @param peerId The remote peerId which has connected to the signal
+   * server. Can be used directly to connect via `connectToPeer`
+   */
+  signalPeerConnected: (peerId: PeerId) => MaybePromise<void>;
 }
 
 interface PeerState {
@@ -147,11 +157,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     this._dataTimeoutMs = option.unknown(dataTimeoutMs);
     this._maxChunkSizeBytes = option.unknown(maxChunkSizeBytes);
 
-    this.#logger = new Logger(
-      "rtcio:core",
-      RTC.name,
-      crypto.randomUUID().slice(0, 8),
-    );
+    this.#logger = new Logger("rtcio:core", "RTC", v4().slice(0, 8));
 
     this.setupListeners();
   }
@@ -178,6 +184,16 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
             reject: () => {},
           });
         });
+      },
+      this._lifecycleCleanupAbortController.signal,
+    );
+
+    this._signalingInterface.on(
+      "newSignalPeerConnected",
+      async (newPeer) => {
+        for (const callback of this._events["signalPeerConnected"] ?? []) {
+          await callback(newPeer);
+        }
       },
       this._lifecycleCleanupAbortController.signal,
     );

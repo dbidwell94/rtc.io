@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@dbidwell94/ts-utils": "^1.2.0",
-    "@rtcio/logger": "workspace:*"
+    "@rtcio/logger": "workspace:*",
+    "uuid": "^13.0.0"
   }
 }
