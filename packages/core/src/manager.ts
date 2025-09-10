@@ -82,6 +82,13 @@ export interface InternalEvents<
    * server. Can be used directly to connect via `connectToPeer`
    */
   signalPeerConnected: (peerId: PeerId) => MaybePromise<void>;
+  /**
+   * Fires whenever a peer disconnects from the remote signal server.
+   *
+   * @param peerId The remote peerId which has disconnected from the
+   * signal server
+   */
+  signalPeerDisconnected: (peerId: PeerId) => MaybePromise<void>;
 }
 
 interface PeerState {
@@ -193,6 +200,16 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       async (newPeer) => {
         for (const callback of this._events["signalPeerConnected"] ?? []) {
           await callback(newPeer);
+        }
+      },
+      this._lifecycleCleanupAbortController.signal,
+    );
+
+    this._signalingInterface.on(
+      "signalPeerDisconnected",
+      async (peerId) => {
+        for (const callback of this._events["signalPeerDisconnected"] ?? []) {
+          await callback(peerId);
         }
       },
       this._lifecycleCleanupAbortController.signal,

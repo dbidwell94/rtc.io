@@ -1,5 +1,11 @@
 # @rtcio/signaling
 
+## 0.3.0
+
+### Minor Changes
+
+- Added a 2 new event types which will automatically be subscribed to in the RTC class
+
 ## 0.2.0
 
 ### Minor Changes

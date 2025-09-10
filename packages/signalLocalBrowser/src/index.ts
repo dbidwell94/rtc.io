@@ -85,22 +85,26 @@ export default class LocalSignalServer implements ClientSignaler {
   }
 
   sendOffer(toPeer: PeerId, offer: RTCSessionDescriptionInit): void {
-    this.#logger.verbose("Sending offer to %s: %o", toPeer, offer);
+    this.#logger.verbose("Sending offer to {%s}: %o", toPeer, offer);
     this.sendMessage(toPeer, "offer", this._ownId, offer);
   }
 
   sendAnswer(toPeer: PeerId, answer: RTCSessionDescriptionInit): void {
-    this.#logger.verbose("Sending answer to %s: %o", toPeer, answer);
+    this.#logger.verbose("Sending answer to {%s}: %o", toPeer, answer);
     this.sendMessage(toPeer, "answer", this._ownId, answer);
   }
 
   sendIceCandidate(toPeer: PeerId, candidate: RTCIceCandidateInit): void {
-    this.#logger.verbose("Sending ice candidate to %s: %o", toPeer, candidate);
+    this.#logger.verbose(
+      "Sending ice candidate to {%s}: %o",
+      toPeer,
+      candidate,
+    );
     this.sendMessage(toPeer, "iceCandidate", this._ownId, candidate);
   }
 
   rejectOffer(toPeer: PeerId): void {
-    this.#logger.verbose("Sending offer rejection to %s", toPeer);
+    this.#logger.verbose("Sending offer rejection to {%s}", toPeer);
     this.sendMessage(toPeer, "connectionRejected", this._ownId);
   }
 
@@ -109,7 +113,7 @@ export default class LocalSignalServer implements ClientSignaler {
     listener: SignalerEvents[E],
     abortSignal?: AbortSignal,
   ): void {
-    this.#logger.log("Registering event listener for event: %s", event);
+    this.#logger.log("Registering event listener for event: {%s}", event);
     const wrapper = (e: Event) => {
       const payload = (e as CustomEvent<Parameters<SignalerEvents[E]>>).detail;
 
@@ -125,7 +129,7 @@ export default class LocalSignalServer implements ClientSignaler {
         abortSignal.removeEventListener("abort", abort);
         this.eventHandlers.delete(listener);
         this.#logger.log(
-          "Listener aborted event %s with an abort signal",
+          "Listener aborted event {%s} with an abort signal",
           event,
         );
       };
@@ -145,12 +149,12 @@ export default class LocalSignalServer implements ClientSignaler {
       this._emitter.removeEventListener(event, eventListenerOpt.value);
       this.eventHandlers.delete(handler);
       this.#logger.log(
-        "Listener successfully removed event listener for event: %s",
+        "Listener successfully removed event listener for event: {%s}",
         event,
       );
     } else {
       this.#logger.warn(
-        "Listener attempted to remove event listener for event %s, but event callback not found to be registered. " +
+        "Listener attempted to remove event listener for event {%s}, but event callback not found to be registered. " +
           "This may indicate a memory leak on the caller's side and should be investigated.",
         event,
       );
@@ -174,7 +178,7 @@ export default class LocalSignalServer implements ClientSignaler {
     };
 
     this.#logger.verbose(
-      "Sending message to peer: %s with message: %o",
+      "Sending message to peer: {%s} with message: %o",
       targetId,
       message,
     );

@@ -188,10 +188,6 @@ export class P2PConnection<
   }
 
   private async onDataTimedOut(dataId: string) {
-    this.#logger.warn(
-      "Data has timed out. Informing handlers. DataId: {%s}",
-      dataId,
-    );
     this.callHandlers("dataTimedOut", dataId);
   }
 

@@ -4,6 +4,8 @@ import { createUseRtcListener } from "./useRtcListener";
 import { createUsePeerEmitter } from "./usePeerEmitter";
 import { createUsePeers } from "./usePeers";
 import { useRtc } from "./useRtc";
+import { useSignalPeers } from "./useSignalPeers";
+import { useFileSender } from "./useFileSender";
 
 export function createTypedHooks<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
@@ -14,5 +16,7 @@ export function createTypedHooks<
     usePeerEmitter: createUsePeerEmitter<TEvents>(),
     usePeers: createUsePeers<TEvents>(),
     useRtc: useRtc<TEvents>,
+    useSignalPeers,
+    useFileSender,
   };
 }
