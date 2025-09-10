@@ -341,7 +341,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         "Setting remote description on peer: {%s}",
         peerId.substring(0, 8),
       );
-      await connection.setRemoteDescription(answer);
+      await result.fromPromise(connection.setRemoteDescription(answer));
     };
   }
 
@@ -353,7 +353,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         "Setting ice candidate on peer: {%s}",
         peerId.substring(0, 8),
       );
-      await connection.addIceCandidate(ice);
+      await result.fromPromise(connection.addIceCandidate(ice));
     };
   }
 

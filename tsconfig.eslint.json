@@ -4,6 +4,10 @@
     "allowJs": true,
     "noEmit": true
   },
-  "exclude": ["./jest.setup.js"],
-  "include": ["packages", "./jest.config.mjs", "./eslint.config.mjs"]
+  "include": [
+    "packages",
+    "./vitest-setup.ts",
+    "./vitest.config.ts",
+    "./eslint.config.mjs"
+  ]
 }

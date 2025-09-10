@@ -14,7 +14,7 @@
     "moduleResolution": "bundler",
     "rootDir": ".",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "node"]
   },
   "files": [],
   "exclude": ["./jest.setup.js"],
