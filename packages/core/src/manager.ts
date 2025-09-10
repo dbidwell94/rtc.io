@@ -597,6 +597,27 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   /**
+   * Cancels a pending connection request, if any. If the connection has already
+   * processed successfully, then you should use `P2PConnection.close` instead.
+   *
+   * @param peerId The remote peerId to cancel the request for.
+   */
+  public cancelConnectionRequest(peerId: PeerId): void {
+    if (!this._pendingPeers.has(peerId)) {
+      return;
+    }
+
+    const pending = this._pendingPeers.get(peerId)!;
+    pending.connection.onconnectionstatechange = null;
+
+    pending.globalStateCleanupAbort.abort();
+    pending.tempStateCleanupAbort.abort();
+    pending.binaryData.inspect((channel) => channel.close());
+    pending.data.inspect((channel) => channel.close());
+    pending.connection.close();
+  }
+
+  /**
    * Requests to create a P2P connection to a specified peer. If successful, a
    * `connected` event will be fired. If failed, a `connectionFailed` event will
    * be fired instead. This will start the WebRTC

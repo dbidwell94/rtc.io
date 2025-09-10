@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "tsc --noEmit && jest --forceExit",
+    "test": "tsc --noEmit && ts-jest --forceExit",
     "doc": "typedoc",
     "build": "turbo build check-types",
     "dev": "turbo watch dev",
