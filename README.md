@@ -25,7 +25,7 @@ and the `@rtcio/react` wrapper to get working peer to peer connections for
 local development. The demo is currently a work in progress, but can be viewed
 in the `demo` package in the GitHub repository.
 
-![Working peer to peer connections in Firefox using the LocalSignalServer and React wrapper](https://raw.githubusercontent.com/dbidwell94/rtc.io/master/assets/rtcio.gif)
+![Working peer to peer connections in Firefox using the LocalSignalServer and React wrapper](https://raw.githubusercontent.com/dbidwell94/rtc.io/refs/heads/master/assets/rtcio.gif)
 
 ## Features
 
