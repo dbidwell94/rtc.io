@@ -1,5 +1,11 @@
 # @rtcio/core
 
+## 0.1.4
+
+### Patch Changes
+
+- Added a 2 new event types which will automatically be subscribed to in the RTC class
+
 ## 0.1.3
 
 ### Patch Changes

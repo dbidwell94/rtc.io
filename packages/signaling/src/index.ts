@@ -8,12 +8,13 @@ export interface SignalerEvents {
   iceCandidate: (senderId: PeerId, candidate: RTCIceCandidateInit) => void;
   connectionRejected: (senderId: PeerId) => void;
   newSignalPeerConnected: (newPeerId: PeerId) => void;
+  signalPeerDisconnected: (peerId: PeerId) => void;
 }
 
 export interface ClientSignaler {
   /**
    * This is a request to connect to a room. The signal server should
-   * return a uuid-v4 to the client upon successful connection.
+   * return a unique identifier.
    */
   connectToRoom: (roomName: string) => Promise<Result<PeerId>>;
   /**
@@ -54,6 +55,7 @@ export interface ClientSignaler {
     listener: SignalerEvents[E],
     abortSignal?: AbortSignal,
   ) => void;
+
   /**
    * If the caller calls this, the handler should be removed and no longer be able to be called.
    */

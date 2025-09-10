@@ -1,5 +1,12 @@
 # @rtcio/socket-io-client
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @rtcio/signaling@0.3.0
+
 ## 0.1.3
 
 ### Patch Changes

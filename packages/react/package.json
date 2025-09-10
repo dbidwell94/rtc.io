@@ -2,7 +2,6 @@
   "name": "@rtcio/react",
   "version": "0.1.1",
   "description": "A wrapper around the @rtcio/core library for React integration",
-  "private": true,
   "files": [
     "dist",
     "package.json"

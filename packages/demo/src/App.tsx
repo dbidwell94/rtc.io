@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import { createTypedHooks } from "@rtcio/react";
@@ -8,7 +8,7 @@ interface Events {
   countChanged: (newCount: number) => void;
 }
 
-const { usePeerEmitter, usePeerListener, useRtcListener, usePeers, useRtc } =
+const { usePeerEmitter, usePeerListener, useRtcListener, useRtc } =
   createTypedHooks<Events>();
 
 function App() {
@@ -19,14 +19,19 @@ function App() {
   useRtcListener("signalPeerConnected", (newPeer) => {
     rtc.inspect((manager) => manager.connectToPeer(newPeer));
   });
-  const emitEvent = usePeerEmitter();
-  const peers = usePeers();
 
-  useEffect(() => {
-    for (const peerId of Object.keys(peers)) {
-      emitEvent(peerId, "countChanged", count);
-    }
-  }, [count, emitEvent, peers]);
+  const { emit } = usePeerEmitter();
+
+  const changeCount = useCallback(
+    (evt: React.MouseEvent<HTMLButtonElement>) => {
+      evt.preventDefault();
+      const newNumber = count + 1;
+
+      emit("countChanged", newNumber);
+      setCount(newNumber);
+    },
+    [emit, count],
+  );
 
   return (
     <>
@@ -40,9 +45,7 @@ function App() {
       </div>
       <h1>Vite + React</h1>
       <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
+        <button onClick={changeCount}>count is {count}</button>
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>

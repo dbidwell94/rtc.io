@@ -10,9 +10,22 @@
   - [API Documentation](#api-documentation)
   <!--toc:end-->
 
+> [!WARNING]
+> This package is under heavy development. Expect API to change
+> with minor version bumps until a major version of > 0 gets
+> published. While the core library API is relatively stable,
+> other addons such as `@rtcio/react` will change quickly
+
 Inspired by socket.io, rtcio is an easier to use way of dealing with WebRTC.
 It wraps the logic of creating RTCPeerConnections in easy-to-use callback
 chaining.
+
+The GIF below highlights the use of the `@rtcio/signal-local`, the debug features,
+and the `@rtcio/react` wrapper to get working peer to peer connections for
+local development. The demo is currently a work in progress, but can be viewed
+in the `demo` package in the GitHub repository.
+
+![Working peer to peer connections in Firefox using the LocalSignalServer and React wrapper](https://raw.githubusercontent.com/dbidwell94/rtc.io/master/assets/rtcio.gif)
 
 ## Features
 
@@ -42,13 +55,13 @@ chaining.
     - eg. `rtcio:core:RTC:[1a2b3c4d]:warn This is a warning level`
     - eg. `rtcio:signal-local:LocalSignalServer:[1a2b3c4d] This is a standard log`
 - Create your own signaler by extending `ClientSignaler` in `@rtcio/signaling`
+- A React wrapper via the `@rtcio/react` package.
 
 ## Roadmap
 
 - Handle audio and visual streams
 - Custom signaler with raw websockets
 - Custom signaler with raw Server Sent Events (SSE)
-- Pre-built wrapper for React via `@rtcio/react`
 
 ## Usage/Examples
 
@@ -132,6 +145,18 @@ client2.on("connected", (peer1) => {
 
 await client1.connectToPeer(client2Id);
 ```
+
+> [!IMPORTANT]
+> If testing locally on Firefox, you MUST use your local IP instead of `localhost`.
+> This is a known issue in Firefox and cannot be fixed.
+
+### Example with `vite`
+
+- locahost:5173 for localdev would be 192.168.xx.x:5173
+- This can be easily done using vite --host as seen in the
+  `demo` package in this repository
+
+>
 
 ## API Documentation
 

@@ -1,5 +1,13 @@
 # @rtcio/demo
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @rtcio/signal-local@0.1.4
+  - @rtcio/react@0.1.1
+
 ## 0.0.1
 
 ### Patch Changes

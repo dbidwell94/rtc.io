@@ -10,6 +10,8 @@ createRoot(document.getElementById("root")!).render(
     <P2PProvider
       roomName="Test Room"
       signaler={new LocalSignaler("Test Channel")}
+      dataTimeoutMs={5000}
+      maxChunkSizeBytes={1024 * 4}
     >
       <App />
     </P2PProvider>

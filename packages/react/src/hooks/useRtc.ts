@@ -5,7 +5,7 @@ import { useMemo } from "react";
 /**
  * !IMPORTANT make sure you manually cleanup any events you subscribe to here.
  * Otherwise, use the `useRtcListener` hook for React to automatically manage
- * unsubscriptions
+ * subscriptions
  */
 export function useRtc<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
