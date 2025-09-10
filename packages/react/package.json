@@ -1,0 +1,53 @@
+{
+  "name": "@rtcio/react",
+  "version": "0.1.1",
+  "description": "A wrapper around the @rtcio/core library for React integration",
+  "private": true,
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dbidwell94/rtc.io"
+  },
+  "keywords": [
+    "WebRTC",
+    "RTCPeerConnection",
+    "P2P",
+    "rtcio",
+    "RTCDataChannel",
+    "file",
+    "streaming",
+    "binary",
+    "message",
+    "messaging",
+    "react"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "check-types": "tsc --noEmit"
+  },
+  "author": "Devin Bidwell",
+  "email": "dbidwell94@biddydev.com",
+  "license": "MIT",
+  "devDependencies": {
+    "@rtcio/signal-local": "workspace:*",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.12",
+    "react": "^19.1.1"
+  },
+  "dependencies": {
+    "@dbidwell94/ts-utils": "^1.2.0",
+    "@rtcio/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^17 || ^18 || ^19"
+  }
+}

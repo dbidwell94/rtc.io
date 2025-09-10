@@ -2,6 +2,7 @@ import { ClientSignaler, PeerId, SignalerEvents } from "@rtcio/signaling";
 import { BroadcastChannel } from "broadcast-channel";
 import { option, result, Result } from "@dbidwell94/ts-utils";
 import Logger from "@rtcio/logger";
+import { v4 } from "uuid";
 
 /**
  * A message structure for communication over the BroadcastChannel.
@@ -12,6 +13,9 @@ interface P2PMessage {
   event: keyof SignalerEvents;
   payload: Parameters<SignalerEvents[keyof SignalerEvents]>;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const INTERNAL_HELLO = "__internal_hello" as any;
 
 export default class LocalSignalServer implements ClientSignaler {
   private _channel: BroadcastChannel<P2PMessage>;
@@ -26,7 +30,7 @@ export default class LocalSignalServer implements ClientSignaler {
   constructor(channelName: string = "rtc-io-signaling") {
     this._channel = new BroadcastChannel(channelName);
     this._emitter = new EventTarget();
-    this._ownId = crypto.randomUUID();
+    this._ownId = v4();
 
     this.#logger = new Logger(
       "rtcio:signal-local",
@@ -42,6 +46,20 @@ export default class LocalSignalServer implements ClientSignaler {
         targetId,
         payload,
       });
+
+      // this is a special case. Signaling to the "signal server" that we have
+      // a new peer connection
+      if (
+        eventName === INTERNAL_HELLO &&
+        !targetId &&
+        payload[0] !== this._ownId
+      ) {
+        const helloEvent = new CustomEvent("newSignalPeerConnected", {
+          detail: [...payload],
+        });
+
+        this._emitter.dispatchEvent(helloEvent);
+      }
 
       if (targetId === this._ownId) {
         const customEvent = new CustomEvent(eventName, {
@@ -60,6 +78,9 @@ export default class LocalSignalServer implements ClientSignaler {
   }
 
   async connectToRoom(): Promise<Result<PeerId>> {
+    setTimeout(() => {
+      this.sendMessage(null as unknown as string, INTERNAL_HELLO, this._ownId);
+    }, 500);
     return result.ok(this._ownId);
   }
 

@@ -102,6 +102,7 @@ export class P2PConnection<
   private _peerId: PeerId;
 
   #logger: Logger;
+  #globalCleanupSignal = new AbortController();
 
   private _onCloseManagerCallback: () => MaybePromise<void>;
   private _calledCloseHandlers: boolean = false;
@@ -117,7 +118,7 @@ export class P2PConnection<
   }: P2POptions) {
     this.#logger = new Logger(
       "rtcio:core",
-      P2PConnection.name,
+      "P2PConnection",
       peerId.substring(0, 8),
     );
 
@@ -174,6 +175,7 @@ export class P2PConnection<
         connection.connectionState,
       );
       switch (connection.connectionState) {
+        case "failed":
         case "closed": {
           await this.close();
           break;
@@ -465,6 +467,16 @@ export class P2PConnection<
     return result.ok(undefined);
   }
 
+  /**
+   * Send arbitrary binary data to a remote peer.
+   * @param data The raw data to send to the remote peer
+   * @param metadata Optional JSON serializable metadata you wish
+   * to send with your data. This metadata will be available for the
+   * remote peer.
+   * @returns A `Promise<Result<void>>`. If `isError()`, then the send has
+   * failed. Otherwise the send was successful and is available to the
+   * remote peer
+   */
   async sendRaw<T extends JsonValue>(
     data: ArrayBuffer,
     metadata?: T,
@@ -493,6 +505,13 @@ export class P2PConnection<
     return result.ok(undefined);
   }
 
+  /**
+   * Streams a `File` from the disk to the remote peer. The specified `File` will be
+   * chunked and sent without loading the whole file into memory
+   * @param file The file which you wish to send to the remote peer
+   * @returns A `Promise<Result<void>>`. If `isError()` then the send has failed.
+   * Otherwise, the send was successful.
+   */
   async sendFile(file: File): Promise<Result<void>> {
     this.#logger.verbose("sendFile");
     const fileMetadata: FileMetadata = {
@@ -542,6 +561,11 @@ export class P2PConnection<
     }
   }
 
+  /**
+   * Emit a new event with arguments to a remote peer.
+   * @param event The key for the event you wish to send to the remote peer
+   * @param args All the args for the specified event
+   */
   async emit<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     ...args: Parameters<ClientToPeerEvents[TKey]>
@@ -573,10 +597,26 @@ export class P2PConnection<
     return result.ok(undefined);
   }
 
+  /**
+   * Subscribes a new event listener to the specified event. This subscription
+   * will only be called one time. If you want a persistant subscription, use `on`
+   * instead.
+   *
+   * @param event The key for the event to listen to.
+   * @param callback The function which will be called when this event is received.
+   */
   once<TKey extends keyof InternalEvents>(
     event: TKey,
     callback: InternalEvents[TKey],
   ): void;
+  /**
+   * Subscribes a new event listener to the specified event. This subscription
+   * will only be called one time. If you want a persistant subscription, use `on`
+   * instead.
+   *
+   * @param event The key for the event to listen to.
+   * @param callback The function which will be called when this event is received.
+   */
   once<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     callback: ClientToPeerEvents[TKey],
@@ -593,18 +633,46 @@ export class P2PConnection<
     }
   }
 
+  /**
+   * Subscribes a new event listener to the specified event.
+   * @param event The key for the event to listen to.
+   * @param callback The function which will be called when this event is received.
+   * @param abortSignal An optional abort signal which you can use to remove the
+   * the specified handler from this event's listener map
+   */
   on<TKey extends keyof InternalEvents>(
     event: TKey,
     callback: InternalEvents[TKey],
+    abortSignal?: AbortSignal,
   ): void;
+  /**
+   * Subscribes a new event listener to the specified event.
+   * @param event The key for the event to listen to.
+   * @param callback The function which will be called when this event is received.
+   * @param abortSignal An optional abort signal which you can use to remove the
+   * the specified handler from this event's listener map
+   */
   on<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     callback: ClientToPeerEvents[TKey],
+    abortSignal?: AbortSignal,
   ): void;
   on<TKey extends keyof EventMap<ClientToPeerEvents>>(
     event: TKey,
     handler: EventMap<ClientToPeerEvents>[TKey],
+    abortSignal?: AbortSignal,
   ) {
+    if (abortSignal) {
+      const cleanup = () => {
+        this._events[event]?.delete(handler);
+        this.#logger.log("Cancelled event {%s} via an AbortSignal", event);
+        abortSignal.removeEventListener("abort", cleanup);
+      };
+      abortSignal.addEventListener("abort", cleanup, {
+        signal: this.#globalCleanupSignal.signal,
+      });
+    }
+
     this.#logger.log(
       "Registering persistant event listener for event: %s",
       event,
@@ -616,10 +684,26 @@ export class P2PConnection<
     }
   }
 
+  /**
+   * Removes the specified event listener from the event listener map.
+   * @param event The key for the event you want to remove the handler for
+   * @param callback The actual function you want to remove from the event map.
+   * This can not be an anonomous function, as the function pointer will always
+   * be different and will not be removed from the event map. If you wish to
+   * use an anonomous function, call `on` with an AbortSignal instead.
+   */
   off<TKey extends keyof InternalEvents>(
     event: TKey,
     callback: InternalEvents[TKey],
   ): void;
+  /**
+   * Removes the specified event listener from the event listener map.
+   * @param event The key for the event you want to remove the handler for
+   * @param callback The actual function you want to remove from the event map.
+   * This can not be an anonomous function, as the function pointer will always
+   * be different and will not be removed from the event map. If you wish to
+   * use an anonomous function, call `on` with an AbortSignal instead.
+   */
   off<TKey extends keyof ClientToPeerEvents>(
     event: TKey,
     callback: ClientToPeerEvents[TKey],
@@ -641,6 +725,10 @@ export class P2PConnection<
     }
   }
 
+  /**
+   * This method will close all remote connections, as well as cleanup
+   * any event listeners and state ensuring that there are no memory leaks.
+   */
   async close() {
     this.#logger.verbose("close");
     this.#logger.log(
@@ -692,5 +780,6 @@ export class P2PConnection<
     this._binaryData.close();
     this._connection.close();
     await Promise.all([closeData, closeBinaryData, closeConn]);
+    this.#globalCleanupSignal.abort();
   }
 }

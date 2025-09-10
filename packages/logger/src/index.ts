@@ -1,5 +1,4 @@
 import { debug, type Debugger } from "debug";
-import { red, yellow } from "colors/safe";
 
 type Params = Parameters<Debugger>;
 
@@ -33,12 +32,10 @@ export default class Logger {
   }
 
   warn(...args: Params) {
-    const [logString, ...argsNoString] = args;
-    this.#warn(yellow(logString), ...argsNoString);
+    this.#warn(...args);
   }
 
   error(...args: Params) {
-    const [logString, ...argsNoString] = args;
-    this.#error(red(logString), ...argsNoString);
+    this.#error(...args);
   }
 }

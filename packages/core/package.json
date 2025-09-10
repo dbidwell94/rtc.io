@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "files": [
     "dist",
@@ -29,6 +29,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "check-types": "tsc --noEmit"
   },
   "author": "Devin Bidwell",
@@ -38,11 +39,12 @@
     "@roamhq/wrtc": "^0.9.0",
     "@rtcio/signal-local": "workspace:*",
     "@rtcio/signaling": "workspace:*",
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.3.1",
     "wait-for-expect": "^4.0.0"
   },
   "dependencies": {
-    "@dbidwell94/ts-utils": "^1.1.0",
-    "@rtcio/logger": "workspace:*"
+    "@dbidwell94/ts-utils": "^1.2.0",
+    "@rtcio/logger": "workspace:*",
+    "uuid": "^13.0.0"
   }
 }

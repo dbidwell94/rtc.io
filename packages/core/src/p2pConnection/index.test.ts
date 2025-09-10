@@ -4,6 +4,7 @@ import { P2PConnection, VoidMethods } from ".";
 import { RTC, RtcOptions } from "../manager";
 import { JsonObject } from "./binaryData";
 import { Option } from "@dbidwell94/ts-utils";
+import { describe, it, vitest, expect } from "vitest";
 
 interface Events {
   test: (arg1: string) => void;
@@ -70,7 +71,7 @@ describe("src/p2pConnection/index.ts", () => {
 
   it("Unsubscribes from events", async () => {
     const testData = "TEST";
-    const spy = jest.fn();
+    const spy = vitest.fn();
 
     const [peer1, peer2] = await createPeers<Events>();
 
@@ -87,7 +88,7 @@ describe("src/p2pConnection/index.ts", () => {
     const testData = "TEST";
     const [peer1, peer2] = await createPeers<Events>();
 
-    const spy = jest.fn();
+    const spy = vitest.fn();
     peer1.once("test", spy);
 
     for (let i = 0; i < 10; i++) {
@@ -105,7 +106,7 @@ describe("src/p2pConnection/index.ts", () => {
     const testData = "TEST";
     const [peer1, peer2] = await createPeers<Events>();
 
-    const spy = jest.fn();
+    const spy = vitest.fn();
     peer1.on("test", spy);
 
     peer2.emit("test", testData);
@@ -145,8 +146,8 @@ describe("src/p2pConnection/index.ts", () => {
   it("Sends a closed event to a connected peer when one peer closes the connection", async () => {
     const [peer1, peer2, manager1, manager2] = await createPeers();
 
-    const onClose = jest.fn();
-    const onError = jest.fn();
+    const onClose = vitest.fn();
+    const onError = vitest.fn();
 
     peer1.on("connectionClosed", onClose);
     peer2.on("connectionClosed", onClose);

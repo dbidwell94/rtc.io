@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-
-const wrtc = require("@roamhq/wrtc");
-const util = require("util");
-const stream = require("node:stream/web");
-const blob = require("node:buffer");
+import wrtc from "@roamhq/wrtc";
+import util from "util";
+import stream from "node:stream/web";
+import blob from "node:buffer";
 
 Object.defineProperties(globalThis, {
   TextEncoder: { value: util.TextEncoder },

@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/logger",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A P2P connection library aimed to make RTCPeerConnections easier to use",
   "repository": {
     "type": "git",
@@ -18,6 +18,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "check-types": "tsc --noEmit"
   },
   "author": "Devin Bidwell",
@@ -27,7 +28,6 @@
     "@types/debug": "^4.1.12"
   },
   "dependencies": {
-    "colors": "^1.4.0",
     "debug": "4.4.0"
   }
 }

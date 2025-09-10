@@ -1,7 +1,8 @@
-import { P2PConnection, type VoidMethods } from "./p2pConnection";
+import { MaybePromise, P2PConnection, type VoidMethods } from "./p2pConnection";
 import { type ClientSignaler, type PeerId } from "@rtcio/signaling";
 import { type Option, option, type Result, result } from "@dbidwell94/ts-utils";
 import Logger from "@rtcio/logger";
+import { v4 } from "uuid";
 
 const DATA_CHANNEL_GENERIC = "generic";
 const DATA_CHANNEL_BINARY = "binary";
@@ -52,17 +53,35 @@ export interface InternalEvents<
   connected: (peer: P2PConnection<ClientToPeerEvents>) => void;
   /**
    * The request to connect to the remote peer has failed.
+   *
+   * @param peerId the `PeerId` of the remote peer that failed to connect
    */
   connectionFailed: (peerId: PeerId) => void;
   /**
    * A new connection has been requested by a remote peer.You may
    * inspect the `offer.remoteId` to view the uuid-v4 of the remote peer.
+   *
+   * @param offer A set of helper functions which you can use to either
+   * accept or reject the offer. This also contains the `PeerId` of the
+   * incoming remote offer
    */
   connectionRequest: (offer: RemoteOffer) => void;
   /**
    * Called if there is an error in the RTC or Signaling process
+   *
+   * @param error The `Error` instance which was returned for any of the
+   * `RTC` events.
    */
   error: (error: Error) => void;
+
+  /**
+   * Fires whenever a new peer connects to the specified room of the
+   * Signal Server.
+   *
+   * @param peerId The remote peerId which has connected to the signal
+   * server. Can be used directly to connect via `connectToPeer`
+   */
+  signalPeerConnected: (peerId: PeerId) => MaybePromise<void>;
 }
 
 interface PeerState {
@@ -138,11 +157,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
     this._dataTimeoutMs = option.unknown(dataTimeoutMs);
     this._maxChunkSizeBytes = option.unknown(maxChunkSizeBytes);
 
-    this.#logger = new Logger(
-      "rtcio:core",
-      RTC.name,
-      crypto.randomUUID().slice(0, 8),
-    );
+    this.#logger = new Logger("rtcio:core", "RTC", v4().slice(0, 8));
 
     this.setupListeners();
   }
@@ -169,6 +184,16 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
             reject: () => {},
           });
         });
+      },
+      this._lifecycleCleanupAbortController.signal,
+    );
+
+    this._signalingInterface.on(
+      "newSignalPeerConnected",
+      async (newPeer) => {
+        for (const callback of this._events["signalPeerConnected"] ?? []) {
+          await callback(newPeer);
+        }
       },
       this._lifecycleCleanupAbortController.signal,
     );
@@ -223,6 +248,11 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
 
   /**
    * Removes an event listener for the specified internal event
+   * @param event The key to the event you wish to unsubscribe to.
+   * @param handler The function pointer you wish to unsubscribe to.
+   * This can not be an anonomous function, as the pointer will be
+   * different every time. If you wish to use an anonomous function,
+   * call `on` with an AbortSignal instead and use `abortController.abort()`
    */
   public off<TKey extends keyof InternalEvents<ClientToPeerEvent>>(
     event: TKey,
@@ -256,6 +286,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * // specified in the constructor.
    * await p2pManager.connectToRoom();
    *
+   * @returns A `Promise<Result<PeerId>>`. If `isError()`, then the connection
+   * to the signal server has failed. Otherwise, your peerId will be available
+   * at `yourResult.value`
    */
   public async connectToRoom(): Promise<Result<PeerId>> {
     this.#logger.verbose("Attempting to connect to room: {%s}", this._roomName);
@@ -277,7 +310,6 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    * Gets a list of the peers from the signaling server in the current room.
    *
    * @example
-   * ```ts
    * import { RTC } from 'rtc.io';
    *
    * const p2pManager = new RTC(signaler, 'myRoom');
@@ -286,7 +318,9 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
    *  // This will send the connection request to the remote peer.
    *  await p2pManager.connectToPeer(remotePeer);
    * }
-   * ```
+   *
+   * @returns An `Array<PeerId>` of all the peers connected to the current
+   * signal server's room. Your id is not included in this array.
    */
   public getRoomPeers(): Array<PeerId> {
     this.#logger.verbose("Gathering room peers from the signal server");
@@ -307,7 +341,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         "Setting remote description on peer: {%s}",
         peerId.substring(0, 8),
       );
-      await connection.setRemoteDescription(answer);
+      await result.fromPromise(connection.setRemoteDescription(answer));
     };
   }
 
@@ -319,7 +353,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
         "Setting ice candidate on peer: {%s}",
         peerId.substring(0, 8),
       );
-      await connection.addIceCandidate(ice);
+      await result.fromPromise(connection.addIceCandidate(ice));
     };
   }
 
@@ -563,9 +597,36 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
   }
 
   /**
+   * Cancels a pending connection request, if any. If the connection has already
+   * processed successfully, then you should use `P2PConnection.close` instead.
+   *
+   * @param peerId The remote peerId to cancel the request for.
+   */
+  public cancelConnectionRequest(peerId: PeerId): void {
+    if (!this._pendingPeers.has(peerId)) {
+      return;
+    }
+
+    const pending = this._pendingPeers.get(peerId)!;
+    pending.connection.onconnectionstatechange = null;
+
+    pending.globalStateCleanupAbort.abort();
+    pending.tempStateCleanupAbort.abort();
+    pending.binaryData.inspect((channel) => channel.close());
+    pending.data.inspect((channel) => channel.close());
+    pending.connection.close();
+  }
+
+  /**
    * Requests to create a P2P connection to a specified peer. If successful, a
    * `connected` event will be fired. If failed, a `connectionFailed` event will
-   * be fired instead.
+   * be fired instead. This will start the WebRTC
+   * offer/answer/icecandidate negotiation dance
+   *
+   * @param peerId The `PeerId` to the remote peer you wish to connect to.
+   * @returns A `Promise<Result<void>>`. If `isError()` then the initial
+   * offer generation has failed.  You may wish to try again after ensuring
+   * the connection to the signal server is stable.
    */
   public async connectToPeer(peerId: PeerId): Promise<Result<void>> {
     if (this._pendingPeers.has(peerId) || this._connectedPeers.has(peerId)) {

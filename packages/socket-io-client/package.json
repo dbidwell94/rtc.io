@@ -1,6 +1,6 @@
 {
   "name": "@rtcio/socket-io-client",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "repository": {
     "type": "git",
@@ -26,16 +26,16 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "check-types": "tsc --noEmit"
   },
   "author": "Devin Bidwell <dbidwell94@biddydev.com>",
   "license": "MIT",
   "description": "An implementation of the @rtcio/signaling ClientSignaler for a socket.io client",
   "dependencies": {
+    "@dbidwell94/ts-utils": "^1.2.0",
     "@rtcio/logger": "workspace:*",
     "@rtcio/signaling": "workspace:*",
-    "socket.io-client": "^4.8",
-    "@dbidwell94/ts-utils": "^1.1.0"
-  },
-  "devDependencies": {}
+    "socket.io-client": "^4.8.1"
+  }
 }
