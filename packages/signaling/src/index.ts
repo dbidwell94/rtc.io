@@ -7,6 +7,7 @@ export interface SignalerEvents {
   answer: (senderId: PeerId, answer: RTCSessionDescriptionInit) => void;
   iceCandidate: (senderId: PeerId, candidate: RTCIceCandidateInit) => void;
   connectionRejected: (senderId: PeerId) => void;
+  newSignalPeerConnected: (newPeerId: PeerId) => void;
 }
 
 export interface ClientSignaler {

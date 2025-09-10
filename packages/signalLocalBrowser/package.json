@@ -36,7 +36,8 @@
   "dependencies": {
     "@dbidwell94/ts-utils": "^1.2.0",
     "@rtcio/logger": "workspace:*",
-    "broadcast-channel": "^7.1.0"
+    "broadcast-channel": "^7.1.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@rtcio/signaling": "workspace:*",
