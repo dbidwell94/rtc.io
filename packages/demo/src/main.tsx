@@ -1,9 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "./index.css";
-import App from "./App.tsx";
 import LocalSignaler from "@rtcio/signal-local";
 import { P2PProvider } from "@rtcio/react";
+import App from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

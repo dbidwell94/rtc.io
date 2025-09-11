@@ -1,60 +1,80 @@
-import { useCallback, useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import { CssBaseline, Box, ThemeProvider, createTheme } from "@mui/material";
+import React from "react";
+import ChatArea from "./components/ChatArea";
+import UsersPanel from "./components/UserPanel";
+import type { User, Message, Events } from "./types";
 import { createTypedHooks } from "@rtcio/react";
-import "./App.css";
+import { option, type Option } from "@dbidwell94/ts-utils";
 
-interface Events {
-  countChanged: (newCount: number) => void;
-}
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+    primary: {
+      main: "#7289da",
+    },
+    background: {
+      paper: "#2f3136", // Main content area
+      default: "#202225", // Deepest background
+    },
+    text: {
+      primary: "#dcddde",
+      secondary: "#b9bbbe",
+    },
+  },
+  typography: {
+    fontFamily: '"Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
+  },
+});
 
-const { usePeerEmitter, usePeerListener, useRtcListener, useRtc } =
-  createTypedHooks<Events>();
+const { useRtcListener, usePeerListener, useRtc } = createTypedHooks<Events>();
 
-function App() {
-  const [count, setCount] = useState(0);
+export default function App() {
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [selectedUser, setSelectedUser] = React.useState<Option<User>>(
+    option.none(),
+  );
+
   const rtc = useRtc();
-  usePeerListener("countChanged", (newCount) => setCount(newCount));
+
   useRtcListener("connectionRequest", (req) => req.accept());
-  useRtcListener("signalPeerConnected", (newPeer) => {
-    rtc.inspect((manager) => manager.connectToPeer(newPeer));
+  useRtcListener("connected", (peer) => {
+    setUsers((curr) => [
+      ...curr,
+      { name: peer.id.substring(0, 8), status: "online", id: peer.id },
+    ]);
+  });
+  useRtcListener("signalPeerConnected", (peerId) => {
+    rtc.inspect((val) => val.connectToPeer(peerId));
   });
 
-  const { emit } = usePeerEmitter();
+  usePeerListener("message", (_, message) => {
+    console.log(message);
+    setMessages((curr) => [...curr, message]);
+  });
 
-  const changeCount = useCallback(
-    (evt: React.MouseEvent<HTMLButtonElement>) => {
-      evt.preventDefault();
-      const newNumber = count + 1;
-
-      emit("countChanged", newNumber);
-      setCount(newNumber);
-    },
-    [emit, count],
-  );
+  const handleUserSelect = (user: User) => {
+    setSelectedUser(option.some(user));
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={changeCount}>count is {count}</button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
+      <Box
+        sx={{
+          display: "flex",
+          height: "100vh",
+          width: "100vw",
+          overflow: "hidden",
+        }}
+      >
+        <UsersPanel
+          users={users}
+          selectedUser={selectedUser}
+          onUserSelect={handleUserSelect}
+        />
+        <ChatArea user={selectedUser} messages={messages} />
+      </Box>
+    </ThemeProvider>
   );
 }
-
-export default App;

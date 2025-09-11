@@ -15,11 +15,13 @@ export interface SocketIoClientToServerEvent {
   answer: (toPeer: PeerId, answer: RTCSessionDescriptionInit) => void;
   iceCandidate: (toPeer: PeerId, candidate: RTCIceCandidateInit) => void;
   rejectOffer: (toPeer: PeerId) => void;
+  requestPeers: () => PeerId[];
 }
 
 export interface SocketIoServerToClientEvent extends SignalerEvents {
   newPeerConnected: (clientId: PeerId) => void;
   peerLeft: (clientId: PeerId) => void;
+  roomPeers: (peers: PeerId[]) => void;
 }
 
 export default class SocketIoSignaler implements ClientSignaler {
@@ -76,6 +78,10 @@ export default class SocketIoSignaler implements ClientSignaler {
 
     this._socket.on("connect_error", (err) => {
       this.#logger.error("Connection error: %o", err);
+    });
+
+    this._socket.on("roomPeers", (peers) => {
+      this._roomClients = new Set(peers);
     });
   }
 
@@ -161,6 +167,7 @@ export default class SocketIoSignaler implements ClientSignaler {
     }
 
     this._socket.emit("connectToRoom", roomName);
+    this._socket.emit("requestPeers");
 
     return this._id.okOr(
       "We have connected to the signal server, but we don't have an id. This is a bug and should be reported.",
