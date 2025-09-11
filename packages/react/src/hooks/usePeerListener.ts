@@ -8,6 +8,15 @@ import {
 import { useContext, useEffect, useRef } from "react";
 import { P2PContext, p2pContext } from "../Provider";
 
+export type WithPeerId<
+  TEvents extends VoidMethods<TEvents> = Record<string, never>,
+> = {
+  [TKey in keyof TEvents]: (
+    peerId: PeerId,
+    ...params: Parameters<TEvents[TKey]>
+  ) => void;
+};
+
 /**
  * This function will create a typed usePeerListener hook
  * which will allow strongly typed event subscriptions
@@ -19,25 +28,29 @@ export function createUsePeerListener<
    * This hook will manage subscriptions for events automatically,
    * unsubscribing if / when the event changes, the callback changes,
    * any time a new peer connects, it will automatically get
-   * subscribed to this event callback
+   * subscribed to this event callback. The peerId will automatically
+   * be the first item passed into the callback, so account for that
+   * when creating your handler.
    */
   function usePeerListener<TKey extends keyof P2PInternalEvents>(
     event: TKey,
-    callback: P2PInternalEvents[TKey],
+    callback: WithPeerId<P2PInternalEvents>[TKey],
   ): void;
   /**
    * This hook will manage subscriptions for events automatically,
    * unsubscribing if / when the event changes, the callback changes,
    * any time a new peer connects, it will automatically get
-   * subscribed to this event callback
+   * subscribed to this event callback. The peerId will automatically
+   * be the first item passed into the callback, so account for that
+   * when creating your handler.
    */
   function usePeerListener<TKey extends keyof TEvents>(
     event: TKey,
-    callback: TEvents[TKey],
+    callback: WithPeerId<TEvents>[TKey],
   ): void;
   function usePeerListener<TKey extends keyof P2PConnectionEventMap<TEvents>>(
     event: TKey,
-    callback: P2PConnectionEventMap<TEvents>[TKey],
+    callback: WithPeerId<P2PConnectionEventMap<TEvents>>[TKey],
   ) {
     type Subscription = {
       eventName: TKey;
@@ -78,7 +91,7 @@ export function createUsePeerListener<
 
           // The handler always calls the latest callback from the ref.
           const handler = (...args: any[]) =>
-            callbackRef.current(...(args as any));
+            callbackRef.current(peerId, ...(args as any));
 
           peer.on(event as any, handler, controller.signal);
           subs.set(peerId, { eventName: event, controller });

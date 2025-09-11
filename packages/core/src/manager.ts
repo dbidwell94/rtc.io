@@ -350,6 +350,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       .filter((peer) => peer !== myId);
   }
 
+  public id(): Option<PeerId> {
+    return this._roomPeerId;
+  }
+
   private onAnswer(peerId: PeerId, connection: RTCPeerConnection) {
     return async (sender: PeerId, answer: RTCSessionDescriptionInit) => {
       if (sender !== peerId) return;

@@ -1,4 +1,4 @@
-import { VoidMethods } from "@rtcio/core";
+import type { VoidMethods } from "@rtcio/core";
 import { createUsePeerListener } from "./usePeerListener";
 import { createUseRtcListener } from "./useRtcListener";
 import { createUsePeerEmitter } from "./usePeerEmitter";
