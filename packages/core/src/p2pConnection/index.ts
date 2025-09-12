@@ -762,16 +762,16 @@ export class P2PConnection<
         res();
         return;
       }
-      this._connection.onconnectionstatechange = async (evt) => {
+      this._connection.onconnectionstatechange = (evt) => {
         const connection = evt.target as RTCPeerConnection;
         if (connection.connectionState === "closed") {
-          await this.onClosed();
           res();
         }
       };
     });
 
     await this.sendClosed();
+    await this.onClosed();
     this._data.close();
     this._binaryData.close();
     this._connection.close();

@@ -9,6 +9,7 @@ export interface User {
 }
 
 export interface Message {
+  id: string;
   user: string;
   text: string;
   time: number;
@@ -17,4 +18,6 @@ export interface Message {
 
 export interface Events {
   message: (message: Message) => void;
+  typing: () => void;
+  lookedAt: (messageId: string) => void;
 }

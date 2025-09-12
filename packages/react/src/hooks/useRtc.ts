@@ -16,6 +16,9 @@ export function useRtc<
   }
 
   return useMemo(() => {
-    return ctx.rtc.map((rtc) => rtc.rtc);
+    return {
+      rtc: ctx.rtc.map((val) => val.rtc),
+      myId: ctx.rtc.map((val) => val.myId),
+    };
   }, [ctx.rtc]);
 }

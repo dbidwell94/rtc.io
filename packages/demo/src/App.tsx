@@ -2,9 +2,12 @@ import { CssBaseline, Box, ThemeProvider, createTheme } from "@mui/material";
 import React from "react";
 import ChatArea from "./components/ChatArea";
 import UsersPanel from "./components/UserPanel";
-import type { User, Message, Events } from "./types";
+import type { Events } from "./types";
 import { createTypedHooks } from "@rtcio/react";
 import { option, type Option } from "@dbidwell94/ts-utils";
+import { useAppDispatch } from "./store";
+import { addMessage } from "./store/messages";
+import { addUser, setUserStatus, UserStatus } from "./store/user";
 
 const darkTheme = createTheme({
   palette: {
@@ -29,32 +32,49 @@ const darkTheme = createTheme({
 const { useRtcListener, usePeerListener, useRtc } = createTypedHooks<Events>();
 
 export default function App() {
-  const [users, setUsers] = React.useState<User[]>([]);
-  const [messages, setMessages] = React.useState<Message[]>([]);
-  const [selectedUser, setSelectedUser] = React.useState<Option<User>>(
+  const dispatch = useAppDispatch();
+
+  const [selectedUser, setSelectedUser] = React.useState<Option<string>>(
     option.none(),
   );
 
-  const rtc = useRtc();
+  const { rtc, myId } = useRtc();
 
   useRtcListener("connectionRequest", (req) => req.accept());
   useRtcListener("connected", (peer) => {
-    setUsers((curr) => [
-      ...curr,
-      { name: peer.id.substring(0, 8), status: "online", id: peer.id },
-    ]);
+    dispatch(
+      addUser({
+        status: UserStatus.Online,
+        connectedAt: new Date().getTime(),
+        id: peer.id,
+        name: peer.id,
+      }),
+    );
   });
   useRtcListener("signalPeerConnected", (peerId) => {
     rtc.inspect((val) => val.connectToPeer(peerId));
   });
 
-  usePeerListener("message", (_, message) => {
-    console.log(message);
-    setMessages((curr) => [...curr, message]);
+  usePeerListener("connectionClosed", (peerId) => {
+    dispatch(setUserStatus({ status: UserStatus.Offline, userId: peerId }));
   });
 
-  const handleUserSelect = (user: User) => {
-    setSelectedUser(option.some(user));
+  usePeerListener("message", (peerId, message) => {
+    if (rtc.isNone() || myId.isNone()) return;
+    dispatch(
+      addMessage({
+        myId: myId.value,
+        createdAt: message.time,
+        fromId: peerId,
+        toId: myId.value,
+        id: message.id,
+        text: message.text,
+      }),
+    );
+  });
+
+  const handleUserSelect = (userId: string) => {
+    setSelectedUser(option.some(userId));
   };
 
   return (
@@ -69,11 +89,10 @@ export default function App() {
         }}
       >
         <UsersPanel
-          users={users}
           selectedUser={selectedUser}
           onUserSelect={handleUserSelect}
         />
-        <ChatArea user={selectedUser} messages={messages} />
+        <ChatArea user={selectedUser} />
       </Box>
     </ThemeProvider>
   );

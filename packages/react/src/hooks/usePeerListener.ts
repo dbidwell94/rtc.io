@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  P2PConnection,
   P2PConnectionEventMap,
   P2PInternalEvents,
   PeerId,
@@ -7,6 +8,7 @@ import {
 } from "@rtcio/core";
 import { useContext, useEffect, useRef } from "react";
 import { P2PContext, p2pContext } from "../Provider";
+import { option } from "@dbidwell94/ts-utils";
 
 export type WithPeerId<
   TEvents extends VoidMethods<TEvents> = Record<string, never>,
@@ -35,6 +37,7 @@ export function createUsePeerListener<
   function usePeerListener<TKey extends keyof P2PInternalEvents>(
     event: TKey,
     callback: WithPeerId<P2PInternalEvents>[TKey],
+    onlyPeerId?: PeerId,
   ): void;
   /**
    * This hook will manage subscriptions for events automatically,
@@ -47,10 +50,12 @@ export function createUsePeerListener<
   function usePeerListener<TKey extends keyof TEvents>(
     event: TKey,
     callback: WithPeerId<TEvents>[TKey],
+    onlyPeerId?: PeerId,
   ): void;
   function usePeerListener<TKey extends keyof P2PConnectionEventMap<TEvents>>(
     event: TKey,
     callback: WithPeerId<P2PConnectionEventMap<TEvents>>[TKey],
+    onlyPeerId?: PeerId,
   ) {
     type Subscription = {
       eventName: TKey;
@@ -77,14 +82,32 @@ export function createUsePeerListener<
       // 1. Clean up stale subscriptions.
       // This runs for peers that have left OR if the event name has changed.
       for (const [peerId, sub] of subs.entries()) {
-        if (!currentPeerIds.has(peerId) || sub.eventName !== event) {
+        if (
+          !currentPeerIds.has(peerId) ||
+          sub.eventName !== event ||
+          (onlyPeerId && peerId !== onlyPeerId)
+        ) {
           sub.controller.abort();
           subs.delete(peerId);
         }
       }
 
+      const iterable = option
+        .unknown(onlyPeerId)
+        .andThen((val) => {
+          if (peers.current.get(val)) {
+            return option.some<[PeerId, P2PConnection<TEvents>]>([
+              val,
+              peers.current.get(val)!,
+            ]);
+          }
+          return option.none<[PeerId, P2PConnection<TEvents>]>();
+        })
+        .map(([peerId, conn]) => new Map([[peerId, conn]]).entries())
+        .unwrapOr(peers.current.entries());
+
       // 2. Add subscriptions for new peers.
-      for (const [peerId, peer] of peers.current.entries()) {
+      for (const [peerId, peer] of iterable) {
         // If a subscription for this peer doesn't already exist, create one.
         if (!subs.has(peerId)) {
           const controller = new AbortController();
@@ -97,7 +120,7 @@ export function createUsePeerListener<
           subs.set(peerId, { eventName: event, controller });
         }
       }
-    }, [peerIds, event]);
+    }, [peerIds, event, onlyPeerId]);
 
     // 3. When component unmounts, clean up all subscriptions
     useEffect(() => {
