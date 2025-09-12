@@ -12,33 +12,29 @@ import {
 import Mic from "@mui/icons-material/Mic";
 import Headset from "@mui/icons-material/Headset";
 import Settings from "@mui/icons-material/Settings";
-import type { Events, User } from "../types";
+import type { Events } from "../types";
 import { createTypedHooks } from "@rtcio/react";
 import { useMemo } from "react";
 import { type Option } from "@dbidwell94/ts-utils";
+import { useAppSelector } from "../store";
+import { UserStatus } from "../store/user";
 
 interface UsersPanelProps {
-  users: User[];
-  selectedUser: Option<User>;
-  onUserSelect: (user: User) => void;
+  selectedUser: Option<string>;
+  onUserSelect: (userId: string) => void;
 }
 
 const { useRtc } = createTypedHooks<Events>();
 
-const UsersPanel = ({ users, selectedUser, onUserSelect }: UsersPanelProps) => {
-  const rtc = useRtc();
+const UsersPanel = ({ selectedUser, onUserSelect }: UsersPanelProps) => {
+  const { myId: myIdOpt } = useRtc();
 
-  const myId = useMemo(
-    () => rtc.andThen((val) => val.id().map((id) => id.substring(0, 8))),
-    [rtc],
-  );
+  const myId = myIdOpt.map((val) => val.substring(0, 8));
+  const usersObj = useAppSelector((state) => state.users.users);
 
-  const statusColor = {
-    online: "#43b581",
-    idle: "#faa61a",
-    dnd: "#f04747",
-    offline: "#747f8d",
-  };
+  const users = useMemo(() => {
+    return Object.values(usersObj);
+  }, [usersObj]);
 
   return (
     <Box
@@ -68,24 +64,18 @@ const UsersPanel = ({ users, selectedUser, onUserSelect }: UsersPanelProps) => {
               key={user.name}
               sx={{ borderRadius: "4px" }}
               selected={selectedUser
-                .map((val) => val.name === user.name)
+                .map((val) => val === user.id)
                 .unwrapOr(false)}
-              onClick={() => onUserSelect(user)}
+              onClick={() => onUserSelect(user.id)}
             >
               <ListItemIcon sx={{ minWidth: 0, mr: 1.5 }}>
                 <Badge
                   overlap="circular"
                   anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                   variant="dot"
-                  sx={{
-                    "& .MuiBadge-dot": {
-                      backgroundColor: statusColor[user.status],
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      border: "2px solid #2f3136",
-                    },
-                  }}
+                  color={
+                    user.status === UserStatus.Online ? "success" : "error"
+                  }
                 >
                   <Avatar
                     sx={{ width: 32, height: 32, bgcolor: "primary.main" }}

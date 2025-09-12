@@ -73,7 +73,6 @@ export interface InternalEvents<
    * `RTC` events.
    */
   error: (error: Error) => void;
-
   /**
    * Fires whenever a new peer connects to the specified room of the
    * Signal Server.
@@ -89,6 +88,12 @@ export interface InternalEvents<
    * signal server
    */
   signalPeerDisconnected: (peerId: PeerId) => MaybePromise<void>;
+  /**
+   * Fires when we have a confirmed connection to the remote signal server.
+   *
+   * @param peerId Your local peerId associated with the remote signal server.
+   */
+  connectedToSignalServer: (myId: PeerId) => MaybePromise<void>;
 }
 
 interface PeerState {
@@ -318,6 +323,10 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       return myPeerIdRes;
     }
 
+    for (const callback of this._events["connectedToSignalServer"] ?? []) {
+      await callback(myPeerIdRes.value);
+    }
+
     this._roomPeerId = option.some(myPeerIdRes.value);
     this.#logger.log("Successfully connected to room: {%s}", this._roomName);
     return result.ok(myPeerIdRes.value);
@@ -350,7 +359,7 @@ export class RTC<ClientToPeerEvent extends VoidMethods<ClientToPeerEvent>> {
       .filter((peer) => peer !== myId);
   }
 
-  public id(): Option<PeerId> {
+  public get id(): Option<PeerId> {
     return this._roomPeerId;
   }
 

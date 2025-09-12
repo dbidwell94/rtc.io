@@ -53,7 +53,7 @@ describe("src/hooks/usePeerEmitter.ts", () => {
 
     expect(
       (
-        await res2.current.emitEvent(
+        await res2.current.emitEvent.emitTo(
           res1.current.rtc.unwrap().myId,
           "custom",
           customMessage,
@@ -93,7 +93,7 @@ describe("src/hooks/usePeerEmitter.ts", () => {
     });
 
     await expect(async () =>
-      (await res1.current.emitEvent("NOPE", "custom")).unwrap(),
+      (await res1.current.emitEvent.emitTo("NOPE", "custom")).unwrap(),
     ).rejects.toBeInstanceOf(Error);
   });
 });
