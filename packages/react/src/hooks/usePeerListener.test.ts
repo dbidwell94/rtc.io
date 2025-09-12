@@ -107,7 +107,10 @@ describe("src/hooks/usePeerListener.ts", () => {
 
     await waitFor(() => {
       expect(fired).toHaveBeenCalledTimes(1);
-      expect(fired).toHaveBeenCalledWith(expectedMessage);
+      expect(fired).toHaveBeenCalledWith(
+        res2.current.rtc.unwrap().myId,
+        expectedMessage,
+      );
     });
   });
 
