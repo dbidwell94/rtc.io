@@ -1,5 +1,12 @@
 # @rtcio/demo
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [cb6399c]
+  - @rtcio/react@0.3.0
+
 ## 0.0.3
 
 ### Patch Changes
