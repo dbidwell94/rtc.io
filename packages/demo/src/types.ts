@@ -17,7 +17,8 @@ export interface Message {
 }
 
 export interface Events {
-  message: (message: Message) => void;
+  message: (message: Message, encrypted: boolean) => void;
   typing: () => void;
   lookedAt: (messageId: string) => void;
+  publicKey: (publicKey: string) => void;
 }

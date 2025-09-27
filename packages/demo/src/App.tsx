@@ -1,13 +1,26 @@
 import { CssBaseline, Box, ThemeProvider, createTheme } from "@mui/material";
-import React from "react";
+import { useState } from "react";
 import ChatArea from "./components/ChatArea";
 import UsersPanel from "./components/UserPanel";
 import type { Events } from "./types";
 import { createTypedHooks } from "@rtcio/react";
 import { option, type Option } from "@dbidwell94/ts-utils";
-import { useAppDispatch } from "./store";
+import { useAppDispatch, useAppSelector } from "./store";
 import { addMessage } from "./store/messages";
-import { addUser, setUserStatus, UserStatus } from "./store/user";
+import {
+  addUser,
+  setKeyForUser,
+  setUserStatus,
+  UserStatus,
+} from "./store/user";
+import {
+  decrypt,
+  PrivateKey,
+  readKey,
+  readMessage,
+  type Key,
+} from "openpgp/lightweight";
+import PromptForEncryption from "./components/PromptForEncryption";
 
 const darkTheme = createTheme({
   palette: {
@@ -33,10 +46,12 @@ const { useRtcListener, usePeerListener, useRtc } = createTypedHooks<Events>();
 
 export default function App() {
   const dispatch = useAppDispatch();
+  const myKeyPair = useAppSelector((state) => state.users.keyPair);
 
-  const [selectedUser, setSelectedUser] = React.useState<Option<string>>(
+  const [selectedUser, setSelectedUser] = useState<Option<string>>(
     option.none(),
   );
+  const [myEncryptionKey, setMyEncryptionKey] = useState(option.none<Key>());
 
   const { rtc, myId } = useRtc();
 
@@ -48,8 +63,12 @@ export default function App() {
         connectedAt: new Date().getTime(),
         id: peer.id,
         name: peer.id,
+        publicKey: option.none<string>().serialize(),
       }),
     );
+    if (option.isSome(myKeyPair)) {
+      peer.emit("publicKey", myKeyPair.value.publicKey);
+    }
   });
   useRtcListener("signalPeerConnected", (peerId) => {
     rtc.inspect((val) => val.connectToPeer(peerId));
@@ -58,19 +77,53 @@ export default function App() {
   usePeerListener("connectionClosed", (peerId) => {
     dispatch(setUserStatus({ status: UserStatus.Offline, userId: peerId }));
   });
-
-  usePeerListener("message", (peerId, message) => {
+  usePeerListener("message", async (peerId, message, isEncrypted) => {
     if (rtc.isNone() || myId.isNone()) return;
-    dispatch(
-      addMessage({
+
+    let messageThunk: ReturnType<typeof addMessage>;
+
+    if (isEncrypted && option.isSome(myKeyPair)) {
+      let key;
+      if (myEncryptionKey.isNone()) {
+        key = await readKey({ armoredKey: myKeyPair.value.privateKey });
+        setMyEncryptionKey(option.some(key));
+      } else {
+        key = myEncryptionKey.value;
+      }
+
+      const encryptedMessage = await readMessage({
+        armoredMessage: message.text,
+      });
+
+      const { data } = await decrypt({
+        message: encryptedMessage,
+        decryptionKeys: key as PrivateKey,
+      });
+
+      messageThunk = addMessage({
+        myId: myId.value,
+        createdAt: message.time,
+        fromId: peerId,
+        toId: myId.value,
+        id: message.id,
+        text: data,
+      });
+    } else {
+      messageThunk = addMessage({
         myId: myId.value,
         createdAt: message.time,
         fromId: peerId,
         toId: myId.value,
         id: message.id,
         text: message.text,
-      }),
-    );
+      });
+    }
+
+    dispatch(messageThunk);
+  });
+
+  usePeerListener("publicKey", (peerId, publicKey) => {
+    dispatch(setKeyForUser({ key: publicKey, userId: peerId }));
   });
 
   const handleUserSelect = (userId: string) => {
@@ -80,6 +133,7 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
+      <PromptForEncryption />
       <Box
         sx={{
           display: "flex",

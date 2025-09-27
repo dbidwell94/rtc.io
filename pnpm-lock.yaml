@@ -93,6 +93,9 @@ importers:
       '@rtcio/signal-local':
         specifier: workspace:*
         version: link:../signalLocalBrowser
+      openpgp:
+        specifier: ^6.2.2
+        version: 6.2.2
       react:
         specifier: ^19.1.1
         version: 19.1.1
@@ -1854,6 +1857,10 @@ packages:
   oblivious-set@1.4.0:
     resolution: {integrity: sha512-szyd0ou0T8nsAqHtprRcP3WidfsN1TnAR5yWXf2mFCEr5ek3LEOkT6EZ/92Xfs74HIdyhG5WkGxIssMU0jBaeg==}
     engines: {node: '>=16'}
+
+  openpgp@6.2.2:
+    resolution: {integrity: sha512-P/dyEqQ3gfwOCo+xsqffzXjmUhGn4AZTOJ1LCcN21S23vAk+EAvMJOQTsb/C8krL6GjOSBxqGYckhik7+hneNw==}
+    engines: {node: '>= 18.0.0'}
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -4290,6 +4297,8 @@ snapshots:
   object-assign@4.1.1: {}
 
   oblivious-set@1.4.0: {}
+
+  openpgp@6.2.2: {}
 
   optionator@0.9.4:
     dependencies:

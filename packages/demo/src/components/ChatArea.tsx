@@ -3,6 +3,7 @@ import {
   GifBoxOutlined,
   AttachFile,
   EmojiEmotions,
+  Send,
 } from "@mui/icons-material";
 import {
   Box,
@@ -11,17 +12,24 @@ import {
   TextField,
   InputAdornment,
   IconButton,
-  Button,
   Paper,
 } from "@mui/material";
 import type { Events } from "../types";
 import { option, type Option } from "@dbidwell94/ts-utils";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createTypedHooks } from "@rtcio/react";
 import { v4 } from "uuid";
 import { useAppDispatch, useAppSelector } from "../store";
 import { addMessage } from "../store/messages";
 import { UserStatus } from "../store/user";
+import { createMessage, encrypt, type Key, readKey } from "openpgp";
 
 interface ChatAreaProps {
   user: Option<string>;
@@ -44,6 +52,13 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
   const [remoteUserTypingTimeout, setRemoteUserTypingTimeout] = useState(
     option.none<ReturnType<typeof setTimeout>>(),
   );
+  const [remoteEncryptionKey, setRemoteEncryptionKey] = useState(
+    option.none<Key>(),
+  );
+  const userOpt = useMemo(
+    () => userIdOpt.andThen((id) => option.unknown(users[id])),
+    [users, userIdOpt],
+  );
 
   usePeerListener(
     "typing",
@@ -62,8 +77,9 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
 
   useEffect(() => {
     return () => {
-      // emitTypingTimeout.inspect((timeout) => clearTimeout(timeout));
+      emitTypingTimeout.inspect((timeout) => clearTimeout(timeout));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -83,17 +99,12 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
   }, [globalMessages]);
 
   useEffect(() => {
-    if (
-      !messageData.trim() ||
-      emitTypingTimeout.isSome() ||
-      userIdOpt.isNone()
-    ) {
+    if (!messageData.trim() || emitTypingTimeout.isSome() || userOpt.isNone()) {
       return;
     }
 
-    emitTo(userIdOpt.value, "typing");
+    emitTo(userOpt.value.id, "typing");
     const timeout = setTimeout(() => {
-      console.log("Clearing timeout");
       setEmitTypingTimeout(option.none());
     }, 750);
     setEmitTypingTimeout(option.some(timeout));
@@ -101,36 +112,66 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
   }, [messageData, userIdOpt]);
 
   const onSubmit = useCallback(
-    (evt: React.FormEvent) => {
+    async (evt: React.FormEvent) => {
       evt.preventDefault();
-      if (!messageData.trim() || userIdOpt.isNone() || myIdOpt.isNone()) {
+      if (!messageData.trim() || userOpt.isNone() || myIdOpt.isNone()) {
         return;
       }
       const createdAt = new Date().getTime();
       const messageId = v4();
-      emitTo(userIdOpt.value, "message", {
-        id: messageId,
-        text: messageData.trim(),
-        time: createdAt,
-        avatar: myIdOpt.value.substring(0, 2),
-        user: myIdOpt.value.substring(0, 8),
-      });
+
+      let messageText: string;
+      let isEncrypted;
+
+      if (option.isSome(userOpt.value.publicKey)) {
+        let encryptionKey: Key;
+        if (remoteEncryptionKey.isNone()) {
+          encryptionKey = await readKey({
+            armoredKey: userOpt.value.publicKey.value,
+          });
+          setRemoteEncryptionKey(option.some(encryptionKey));
+        } else {
+          encryptionKey = remoteEncryptionKey.value;
+        }
+        const message = await createMessage({ text: messageData.trim() });
+
+        messageText = await encrypt<string>({
+          message,
+          encryptionKeys: encryptionKey,
+        });
+        isEncrypted = true;
+      } else {
+        messageText = messageData.trim();
+        isEncrypted = false;
+      }
+
+      emitTo(
+        userOpt.value.id,
+        "message",
+        {
+          id: messageId,
+          text: messageText,
+          time: createdAt,
+          avatar: myIdOpt.value.substring(0, 2),
+          user: myIdOpt.value.substring(0, 8),
+        },
+        isEncrypted,
+      );
+
       dispatch(
         addMessage({
           myId: myIdOpt.value,
           createdAt,
           fromId: myIdOpt.value,
-          toId: userIdOpt.value,
+          toId: userOpt.value.id,
           id: messageId,
           text: messageData.trim(),
         }),
       );
       setMessageData("");
     },
-    [messageData, userIdOpt, emitTo, myIdOpt, dispatch],
+    [messageData, userOpt, emitTo, myIdOpt, dispatch, remoteEncryptionKey],
   );
-
-  const userOpt = userIdOpt.andThen((id) => option.unknown(users[id]));
 
   if (userOpt.isNone() || myIdOpt.isNone()) {
     return (
@@ -151,6 +192,7 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
   }
 
   const user = userOpt.value;
+  console.log({ user });
   const messages = globalMessages[user.id] ?? [];
   const myId = myIdOpt.value;
 
@@ -173,13 +215,6 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
           boxShadow: "0 1px 0 rgba(0,0,0,.2)",
         }}
       >
-        <Typography
-          variant="h6"
-          component="div"
-          sx={{ color: "text.secondary", mr: 1, fontWeight: "medium" }}
-        >
-          @
-        </Typography>
         <Typography variant="h6" sx={{ color: "white", fontWeight: "bold" }}>
           {user.name}
         </Typography>
@@ -211,7 +246,7 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
                 <Avatar
                   sx={{ width: 40, height: 40, mr: 2, bgcolor: "primary.main" }}
                 >
-                  {msg.fromId.substring(0, 2)}
+                  {user.name.substring(0, 1)}
                 </Avatar>
                 <Box>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
@@ -285,7 +320,7 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
             fullWidth
             disabled={user.status !== UserStatus.Online}
             variant="filled"
-            placeholder={`Message @${user.name}`}
+            placeholder={`Message ${user.name}`}
             value={messageData}
             onChange={({ target: { value } }) => setMessageData(value)}
             sx={{
@@ -329,14 +364,13 @@ const ChatArea = ({ user: userIdOpt }: ChatAreaProps) => {
                     >
                       <EmojiEmotions />
                     </IconButton>
-                    <Button
-                      variant="outlined"
+                    <IconButton
                       type="submit"
-                      color="secondary"
+                      sx={{ color: "text.secondary" }}
                       disabled={user.status !== UserStatus.Online}
                     >
-                      Submit
-                    </Button>
+                      <Send />
+                    </IconButton>
                   </InputAdornment>
                 ),
               },

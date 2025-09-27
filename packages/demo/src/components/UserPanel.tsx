@@ -12,10 +12,8 @@ import {
 import Mic from "@mui/icons-material/Mic";
 import Headset from "@mui/icons-material/Headset";
 import Settings from "@mui/icons-material/Settings";
-import type { Events } from "../types";
-import { createTypedHooks } from "@rtcio/react";
 import { useMemo } from "react";
-import { type Option } from "@dbidwell94/ts-utils";
+import { option, type Option } from "@dbidwell94/ts-utils";
 import { useAppSelector } from "../store";
 import { UserStatus } from "../store/user";
 
@@ -24,13 +22,9 @@ interface UsersPanelProps {
   onUserSelect: (userId: string) => void;
 }
 
-const { useRtc } = createTypedHooks<Events>();
-
 const UsersPanel = ({ selectedUser, onUserSelect }: UsersPanelProps) => {
-  const { myId: myIdOpt } = useRtc();
-
-  const myId = myIdOpt.map((val) => val.substring(0, 8));
   const usersObj = useAppSelector((state) => state.users.users);
+  const myName = useAppSelector((state) => state.users.myName);
 
   const users = useMemo(() => {
     return Object.values(usersObj);
@@ -73,9 +67,12 @@ const UsersPanel = ({ selectedUser, onUserSelect }: UsersPanelProps) => {
                   overlap="circular"
                   anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                   variant="dot"
-                  color={
-                    user.status === UserStatus.Online ? "success" : "error"
-                  }
+                  sx={{
+                    "& .MuiBadge-dot": {
+                      backgroundColor:
+                        user.status === UserStatus.Online ? "green" : "grey",
+                    },
+                  }}
                 >
                   <Avatar
                     sx={{ width: 32, height: 32, bgcolor: "primary.main" }}
@@ -124,7 +121,7 @@ const UsersPanel = ({ selectedUser, onUserSelect }: UsersPanelProps) => {
             You
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            @{myId.unwrapOr("Not Connected")}
+            {option.isSome(myName) ? myName.value : ""}
           </Typography>
         </Box>
         <IconButton size="small" sx={{ color: "text.secondary" }}>
