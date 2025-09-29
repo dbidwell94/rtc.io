@@ -1,153 +1,123 @@
-import { CssBaseline, Box, ThemeProvider, createTheme } from "@mui/material";
 import { useState } from "react";
-import ChatArea from "./components/ChatArea";
-import UsersPanel from "./components/UserPanel";
-import type { Events } from "./types";
-import { createTypedHooks } from "@rtcio/react";
-import { option, type Option } from "@dbidwell94/ts-utils";
+import Modal from "./components/Modal";
+import { cls } from "./utils/className";
+import { option } from "@dbidwell94/ts-utils";
+import Button from "./components/Button";
+import { P2PProvider } from "@rtcio/react";
+import Chat from "./Chat";
+import LocalSignalServer from "../../signalLocalBrowser/dist";
+import type { ClientSignaler } from "@rtcio/signaling";
 import { useAppDispatch, useAppSelector } from "./store";
-import { addMessage } from "./store/messages";
-import {
-  addUser,
-  setKeyForUser,
-  setUserStatus,
-  UserStatus,
-} from "./store/user";
-import {
-  decrypt,
-  PrivateKey,
-  readKey,
-  readMessage,
-  type Key,
-} from "openpgp/lightweight";
-import PromptForEncryption from "./components/PromptForEncryption";
+import Input from "./components/Input";
+import { setMyName } from "./store/user";
 
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#7289da",
-    },
-    background: {
-      paper: "#2f3136", // Main content area
-      default: "#202225", // Deepest background
-    },
-    text: {
-      primary: "#dcddde",
-      secondary: "#b9bbbe",
-    },
-  },
-  typography: {
-    fontFamily: '"Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
-  },
-});
+const DemoType = {
+  LocalOnly: "LocalOnly",
+  Global: "Global",
+} as const;
 
-const { useRtcListener, usePeerListener, useRtc } = createTypedHooks<Events>();
+export type DemoTypeValue = (typeof DemoType)[keyof typeof DemoType];
 
 export default function App() {
+  const [demoType, setDemoType] = useState(option.none<DemoTypeValue>());
   const dispatch = useAppDispatch();
-  const myKeyPair = useAppSelector((state) => state.users.keyPair);
+  const { myName } = useAppSelector((state) => state.users);
 
-  const [selectedUser, setSelectedUser] = useState<Option<string>>(
-    option.none(),
-  );
-  const [myEncryptionKey, setMyEncryptionKey] = useState(option.none<Key>());
+  if (demoType.isNone()) {
+    return (
+      <div className="bg-slate-100 w-lvw h-lvh">
+        <Modal title="Welcome to the @rtcio demo!" allowClose={false}>
+          <h2 className={cls`mb-4`}>
+            Experiment with <code className="bg-slate-300">@rtcio/core</code>{" "}
+            and <code className="bg-slate-300">@rtcio/react</code> using two
+            different signaling methods:
+          </h2>
 
-  const { rtc, myId } = useRtc();
+          <ul className={cls`list-disc list-inside`}>
+            <li>
+              Local Demo
+              <ul className={cls`list-disc ml-8`}>
+                <li>
+                  Uses a <code className="bg-slate-300">BroadcastChannel</code>{" "}
+                  to connect peers in different tabs of the same browser.
+                  Perfect for quick, local tests without needing an external
+                  server.
+                </li>
+              </ul>
+            </li>
+            <li>
+              Global Demo
+              <ul className={cls`list-disc ml-8`}>
+                <li>
+                  Uses a <code className="bg-slate-300">Socket.IO</code> server
+                  to connect with users on different computers across the
+                  internet.
+                </li>
+              </ul>
+            </li>
+          </ul>
 
-  useRtcListener("connectionRequest", (req) => req.accept());
-  useRtcListener("connected", (peer) => {
-    dispatch(
-      addUser({
-        status: UserStatus.Online,
-        connectedAt: new Date().getTime(),
-        id: peer.id,
-        name: peer.id,
-        publicKey: option.none<string>().serialize(),
-      }),
+          <h2 className={cls`mt-4`}>
+            <strong>Please note:</strong> This demo does not use TURN servers.
+            If your network has certain restrictions (like a symmetric NAT), the{" "}
+            <strong>Global Demo</strong> may fail to connect.
+          </h2>
+
+          <section className={cls`flex w-full justify-around mt-4`}>
+            <Button
+              buttonText="Try Local"
+              primary
+              onClick={() => setDemoType(option.some(DemoType.LocalOnly))}
+            />
+            <Button
+              buttonText="Try Global"
+              primary
+              disabled
+              onClick={() => setDemoType(option.some(DemoType.Global))}
+            />
+          </section>
+        </Modal>
+      </div>
     );
-    if (option.isSome(myKeyPair)) {
-      peer.emit("publicKey", myKeyPair.value.publicKey);
-    }
-  });
-  useRtcListener("signalPeerConnected", (peerId) => {
-    rtc.inspect((val) => val.connectToPeer(peerId));
-  });
-
-  usePeerListener("connectionClosed", (peerId) => {
-    dispatch(setUserStatus({ status: UserStatus.Offline, userId: peerId }));
-  });
-  usePeerListener("message", async (peerId, message, isEncrypted) => {
-    if (rtc.isNone() || myId.isNone()) return;
-
-    let messageThunk: ReturnType<typeof addMessage>;
-
-    if (isEncrypted && option.isSome(myKeyPair)) {
-      let key;
-      if (myEncryptionKey.isNone()) {
-        key = await readKey({ armoredKey: myKeyPair.value.privateKey });
-        setMyEncryptionKey(option.some(key));
-      } else {
-        key = myEncryptionKey.value;
-      }
-
-      const encryptedMessage = await readMessage({
-        armoredMessage: message.text,
-      });
-
-      const { data } = await decrypt({
-        message: encryptedMessage,
-        decryptionKeys: key as PrivateKey,
-      });
-
-      messageThunk = addMessage({
-        myId: myId.value,
-        createdAt: message.time,
-        fromId: peerId,
-        toId: myId.value,
-        id: message.id,
-        text: data,
-      });
-    } else {
-      messageThunk = addMessage({
-        myId: myId.value,
-        createdAt: message.time,
-        fromId: peerId,
-        toId: myId.value,
-        id: message.id,
-        text: message.text,
-      });
-    }
-
-    dispatch(messageThunk);
-  });
-
-  usePeerListener("publicKey", (peerId, publicKey) => {
-    dispatch(setKeyForUser({ key: publicKey, userId: peerId }));
-  });
-
-  const handleUserSelect = (userId: string) => {
-    setSelectedUser(option.some(userId));
-  };
-
-  return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <PromptForEncryption />
-      <Box
-        sx={{
-          display: "flex",
-          height: "100vh",
-          width: "100vw",
-          overflow: "hidden",
-        }}
+  } else if (option.isNone(myName)) {
+    return (
+      <Modal title="Create Temporary User">
+        <p>Please enter in your desired Username for this chat session.</p>
+        <form
+          className={cls`flex mt-5 flex-col gap-5 items-center`}
+          onSubmit={(evt) => {
+            evt.preventDefault();
+            const data = new FormData(evt.currentTarget);
+            if (data.get("userName")) {
+              dispatch(setMyName(String(data.get("userName")!)));
+            }
+          }}
+        >
+          <div className={cls`flex w-full justify-around gap-5`}>
+            <Input name="userName" label="Username" placeholder="Dudeperson" />
+          </div>
+          <div>
+            <Button buttonText="Submit" primary />
+          </div>
+        </form>
+      </Modal>
+    );
+  } else {
+    const demoTypeValue = demoType.value;
+    return (
+      <P2PProvider
+        roomName="rtcio"
+        maxChunkSizeBytes={64 * 1_000}
+        signaler={
+          demoTypeValue === DemoType.LocalOnly
+            ? new LocalSignalServer()
+            : (null as unknown as ClientSignaler)
+        }
       >
-        <UsersPanel
-          selectedUser={selectedUser}
-          onUserSelect={handleUserSelect}
-        />
-        <ChatArea user={selectedUser} />
-      </Box>
-    </ThemeProvider>
-  );
+        <div className={cls`w-lvw h-lvh`}>
+          <Chat />
+        </div>
+      </P2PProvider>
+    );
+  }
 }
