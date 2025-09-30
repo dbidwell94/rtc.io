@@ -10,15 +10,23 @@ export interface User {
 
 export interface Message {
   id: string;
-  user: string;
   text: string;
   time: number;
-  avatar: string;
 }
 
 export interface Events {
-  message: (message: Message, encrypted: boolean) => void;
+  message: (message: Message) => void;
+  globalMessage: (message: Message) => void;
+  /**
+   * Called every X milliseconds to notify remote peer that typing is still occurring
+   */
   typing: () => void;
+  /**
+   * Called when a remote peer looks at a message.
+   */
   lookedAt: (messageId: string) => void;
-  publicKey: (publicKey: string) => void;
+  /**
+   * Called when a client connects. Sends client information to the remote peer.
+   */
+  hello: (username: string) => void;
 }

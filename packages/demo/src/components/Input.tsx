@@ -9,18 +9,20 @@ export type InputProps = Omit<
   iconPrefix?: typeof MagnifyingGlassIcon;
   label?: string;
   multiline?: boolean;
+  fullWidth?: boolean;
 };
 
 export default function Input({
   iconPrefix: Prefix,
   label,
   multiline = false,
+  fullWidth,
   ...inputProps
 }: InputProps) {
   const InputType = multiline ? "textarea" : "input";
 
   return (
-    <div className={cls`relative flex items-center`}>
+    <div className={cls`relative flex items-center ${fullWidth && "w-full"}`}>
       {label && (
         <label htmlFor={inputProps.name} className={cls`mr-2`}>
           {label}
@@ -35,7 +37,8 @@ export default function Input({
 
       <InputType
         {...inputProps}
-        className={cls`bg-gray-200 ${!multiline && "rounded-full"} py-2 ${Prefix ? "pl-10 pr-2" : "px-2"} border outline-0 focus:border-blue-400 transition-colors`}
+        className={cls`bg-gray-200 ${!multiline && "rounded-full"} py-2 ${Prefix ? "pl-10 pr-2" : "px-2"} border outline-0 focus:border-blue-400 transition-colors
+                    w-full`}
       />
     </div>
   );

@@ -11,19 +11,20 @@ export interface User {
   name: string;
   connectedAt: number;
   status: UserStatus;
-  publicKey: SerializableOption<string>;
 }
 
 interface UserState {
   users: Record<string, User>;
   myId: SerializableOption<string>;
   myName: SerializableOption<string>;
+  selectedUserId: SerializableOption<string>;
 }
 
 const initialState: UserState = {
   users: Object.create(null),
   myId: option.none<string>().serialize(),
   myName: option.unknown(localStorage.getItem("myName")).serialize(),
+  selectedUserId: option.none<string>().serialize(),
 };
 
 export interface CreateKeyPairOptions {
@@ -34,6 +35,13 @@ export const userSlice = createSlice({
   name: "users",
   initialState,
   reducers: {
+    setSelectedUserId: (
+      state,
+      action: PayloadAction<SerializableOption<string>>,
+    ) => {
+      state.selectedUserId = action.payload;
+    },
+
     addUser: (state, action: PayloadAction<User>) => {
       state.users[action.payload.id] = action.payload;
     },
@@ -53,6 +61,7 @@ export const userSlice = createSlice({
     },
     setMyName: (state, myName: PayloadAction<string>) => {
       state.myName = option.some(myName.payload).serialize();
+      localStorage.setItem("myName", myName.payload);
     },
   },
 });
@@ -63,4 +72,5 @@ export const {
   setId: setMyId,
   setMyName,
   setUserStatus,
+  setSelectedUserId,
 } = userSlice.actions;
