@@ -16,7 +16,7 @@
     "test": "tsc --noEmit && vitest run",
     "doc": "typedoc",
     "build": "turbo build check-types",
-    "dev": "turbo watch dev",
+    "dev": "turbo watch dev --env-mode=loose",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "ci:publish": "pnpm build && pnpm publish -r --dry-run"
   },

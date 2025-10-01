@@ -13,7 +13,13 @@ export function rtcioServer(...args: ConstructorParameters<typeof Server>) {
     SocketIoServerToClientEvent
   >(...args);
 
-  const logger = new Logger("rtcio:socket-io-server");
+  const logger = new Logger(
+    "rtcio:socket-io-server",
+    "rtcioServer",
+    crypto.randomUUID().substring(0, 8),
+  );
+
+  logger.log("Starting server...");
 
   const idsToPeers: Map<
     PeerId,
@@ -31,7 +37,7 @@ export function rtcioServer(...args: ConstructorParameters<typeof Server>) {
         roomName,
       );
       peer.join(roomName);
-      io.to(roomName).emit("newPeerConnected", peer.id);
+      io.to(roomName).emit("newSignalPeerConnected", peer.id);
     });
 
     peer.on("disconnect", () => {

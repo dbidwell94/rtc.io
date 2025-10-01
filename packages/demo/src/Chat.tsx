@@ -20,6 +20,7 @@ export default function Chat() {
   });
 
   useRtcListener("signalPeerConnected", (peerId) => {
+    console.log("SignalPeerConnected");
     rtc.inspect((val) => {
       val.connectToPeer(peerId);
     });

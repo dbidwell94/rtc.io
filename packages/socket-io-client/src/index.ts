@@ -19,7 +19,6 @@ export interface SocketIoClientToServerEvent {
 }
 
 export interface SocketIoServerToClientEvent extends SignalerEvents {
-  newPeerConnected: (clientId: PeerId) => void;
   peerLeft: (clientId: PeerId) => void;
   roomPeers: (peers: PeerId[]) => void;
 }
@@ -64,7 +63,7 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   private setupListeners() {
     this.#logger.log("Socket.IO signaler created. Subscribing to events.");
-    this._socket.on("newPeerConnected", (id) => {
+    this._socket.on("newSignalPeerConnected", (id) => {
       this.#logger.verbose(
         "New peer connected. peerId: {%s}",
         id.substring(0, 8),
@@ -176,6 +175,6 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   async close(): Promise<void> {
     this.#logger.log("Closing signaler...");
-    this._socket.close();
+    // this._socket.close();
   }
 }

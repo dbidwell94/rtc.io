@@ -1,4 +1,4 @@
-import { debug, type Debugger } from "debug";
+import debug, { type Debugger } from "debug";
 
 type Params = Parameters<Debugger>;
 

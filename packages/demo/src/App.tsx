@@ -72,7 +72,6 @@ export default function App() {
             <Button
               buttonText="Try Global"
               primary
-              disabled
               onClick={() => setDemoType(option.some(DemoType.Global))}
             />
           </section>
@@ -111,7 +110,7 @@ export default function App() {
         signaler={
           demoTypeValue === DemoType.LocalOnly
             ? new LocalSignalServer()
-            : new SocketIoSignaler("wss://rtcio-demo.biddydev.com")
+            : new SocketIoSignaler("ws://localhost:3000")
         }
       >
         <div className={cls`w-lvw h-lvh`}>
