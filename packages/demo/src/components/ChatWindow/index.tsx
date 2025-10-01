@@ -39,9 +39,9 @@ export default function ChatWindow() {
   }, [selectedUserId, globalMessages, userMessages]);
 
   return (
-    <section className={cls`w-full h-full bg-gray-200 flex-1 flex flex-col`}>
+    <section className={cls`w-full bg-gray-200 flex flex-col`}>
       <div
-        className={cls`flex-1 overflow-y-scroll overflow-x-hidden h-full flex flex-col gap-5 my-4`}
+        className={cls`min-h-0 flex-1 overflow-y-scroll overflow-x-hidden flex flex-col gap-5 my-4`}
       >
         {messages.map((msg) => {
           return (
@@ -55,7 +55,7 @@ export default function ChatWindow() {
       </div>
 
       <form
-        className={cls`w-full p-5 bg-gray-50 flex gap-5`}
+        className={cls`w-full p-5 bg-gray-50 flex gap-5 shrink-0`}
         onSubmit={(evt) => {
           evt.preventDefault();
           if (!messageText.trim() || myId.isNone()) {

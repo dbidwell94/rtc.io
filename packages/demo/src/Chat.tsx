@@ -83,7 +83,7 @@ export default function Chat() {
   return (
     <div className={cls`flex flex-row h-full w-full`}>
       <ChatSidebar />
-      <div className={cls`flex h-full w-full flex-1 flex-col`}>
+      <div className={cls`flex h-full w-full flex-1 flex-col overflow-hidden`}>
         <ChatHeader />
         <ChatWindow />
       </div>

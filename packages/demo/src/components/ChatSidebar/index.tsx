@@ -19,7 +19,7 @@ export default function ChatSidebar() {
 
   return (
     <section
-      className={cls`max-w-60 bg-slate-50 h-full border-r border-slate-200 flex flex-col`}
+      className={cls`w-64 bg-slate-50 h-full border-r border-slate-200 flex flex-col`}
     >
       <div
         className={cls`border-b border-slate-200 px-4 py-5 flex justify-between mb-4`}
