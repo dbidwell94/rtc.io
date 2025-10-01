@@ -16,6 +16,7 @@ import { createTypedHooks } from "@rtcio/react";
 import type { Events } from "../../types";
 import { v4 } from "uuid";
 import MessageComponent from "./Message";
+import ChatHeader from "./ChatHeader";
 
 export type RenderableMessage = GlobalMessage | Message;
 
@@ -39,9 +40,10 @@ export default function ChatWindow() {
   }, [selectedUserId, globalMessages, userMessages]);
 
   return (
-    <section className={cls`w-full bg-gray-200 flex flex-col`}>
+    <section className={cls`w-full bg-gray-200 flex flex-col h-full shrink`}>
+      <ChatHeader />
       <div
-        className={cls`min-h-0 flex-1 overflow-y-scroll overflow-x-hidden flex flex-col gap-5 my-4`}
+        className={cls`flex flex-1 flex-col gap-5 my-4 h-full overflow-y-scroll`}
       >
         {messages.map((msg) => {
           return (
@@ -55,7 +57,7 @@ export default function ChatWindow() {
       </div>
 
       <form
-        className={cls`w-full p-5 bg-gray-50 flex gap-5 shrink-0`}
+        className={cls`w-full p-5 bg-gray-50 flex gap-5 shrink-0 items-center`}
         onSubmit={(evt) => {
           evt.preventDefault();
           if (!messageText.trim() || myId.isNone()) {
@@ -101,12 +103,19 @@ export default function ChatWindow() {
           value={messageText}
           onChange={({ currentTarget: { value } }) => setMessageText(value)}
           multiline
+          onKeyDown={(evt) => {
+            if (evt.key === "Enter" && evt.shiftKey) {
+              evt.preventDefault();
+              evt.currentTarget.form?.requestSubmit();
+            }
+          }}
         />
         <IconButton
           type="submit"
           icon={PaperAirplaneIcon}
           label="Send"
           className={cls`bg-blue-400 rounded-full w-10 h-10 text-center text-white flex justify-center items-center -rotate-90`}
+          disabled={!messageText.trim()}
         />
       </form>
     </section>

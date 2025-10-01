@@ -1,5 +1,4 @@
 import { createTypedHooks } from "@rtcio/react";
-import ChatHeader from "./components/ChatHeader";
 import ChatSidebar from "./components/ChatSidebar";
 import { cls } from "./utils/className";
 import { useAppDispatch, useAppSelector } from "./store";
@@ -83,8 +82,7 @@ export default function Chat() {
   return (
     <div className={cls`flex flex-row h-full w-full`}>
       <ChatSidebar />
-      <div className={cls`flex h-full w-full flex-1 flex-col overflow-hidden`}>
-        <ChatHeader />
+      <div className={cls`flex h-full w-full flex-col overflow-hidden`}>
         <ChatWindow />
       </div>
     </div>

@@ -84,6 +84,9 @@ importers:
       '@rtcio/signal-local':
         specifier: workspace:*
         version: link:../signalLocalBrowser
+      '@rtcio/socket-io-client':
+        specifier: workspace:*
+        version: link:../socket-io-client
       openpgp:
         specifier: ^6.2.2
         version: 6.2.2
@@ -3234,10 +3237,10 @@ snapshots:
 
   '@types/use-sync-external-store@0.0.6': {}
 
-  '@typescript-eslint/eslint-plugin@8.43.0(@typescript-eslint/parser@8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3))(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)':
+  '@typescript-eslint/eslint-plugin@8.43.0(@typescript-eslint/parser@8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.9.2))(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.1
-      '@typescript-eslint/parser': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
+      '@typescript-eslint/parser': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.9.2)
       '@typescript-eslint/scope-manager': 8.43.0
       '@typescript-eslint/type-utils': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
       '@typescript-eslint/utils': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
@@ -4547,7 +4550,7 @@ snapshots:
 
   typescript-eslint@8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.43.0(@typescript-eslint/parser@8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3))(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
+      '@typescript-eslint/eslint-plugin': 8.43.0(@typescript-eslint/parser@8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.9.2))(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
       '@typescript-eslint/parser': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)
       '@typescript-eslint/typescript-estree': 8.43.0(typescript@5.8.3)
       '@typescript-eslint/utils': 8.43.0(eslint@9.35.0(jiti@2.6.0))(typescript@5.8.3)

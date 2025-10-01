@@ -15,6 +15,7 @@
     "@reduxjs/toolkit": "^2.9.0",
     "@rtcio/react": "workspace:*",
     "@rtcio/signal-local": "workspace:*",
+    "@rtcio/socket-io-client": "workspace:*",
     "openpgp": "^6.2.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

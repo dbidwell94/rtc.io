@@ -46,6 +46,7 @@ export default class SocketIoSignaler implements ClientSignaler {
       });
 
       this._socket.on("connect", () => {
+        this.#logger.log("Connected to signal server");
         this._id = option.unknown(this._socket.id);
         res();
       });
@@ -65,14 +66,14 @@ export default class SocketIoSignaler implements ClientSignaler {
     this.#logger.log("Socket.IO signaler created. Subscribing to events.");
     this._socket.on("newPeerConnected", (id) => {
       this.#logger.verbose(
-        "New peer connected. peerId: %s",
+        "New peer connected. peerId: {%s}",
         id.substring(0, 8),
       );
       this._roomClients.add(id);
     });
 
     this._socket.on("peerLeft", (id) => {
-      this.#logger.verbose("Peer left room. peerId: %s", id.substring(0, 8));
+      this.#logger.verbose("Peer left room. peerId: {%s}", id.substring(0, 8));
       this._roomClients.delete(id);
     });
 
@@ -86,7 +87,6 @@ export default class SocketIoSignaler implements ClientSignaler {
   }
 
   getRoomPeers(): Array<PeerId> {
-    this.#logger.verbose("getRoomPeers");
     if (this._id.isNone()) {
       return [...this._roomClients];
     }
@@ -99,7 +99,7 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   sendOffer(toPeer: PeerId, offer: RTCSessionDescriptionInit): void {
     this.#logger.verbose(
-      "Sending offer to peer: %s -- %o",
+      "Sending offer to peer: {%s} %o",
       toPeer.substring(0, 8),
       offer,
     );
@@ -108,7 +108,7 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   sendAnswer(toPeer: PeerId, answer: RTCSessionDescriptionInit): void {
     this.#logger.verbose(
-      "Sending answer to peer: %s -- %o",
+      "Sending answer to peer: {%s} %o",
       toPeer.substring(0, 8),
       answer,
     );
@@ -117,7 +117,7 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   sendIceCandidate(toPeer: PeerId, candidate: RTCIceCandidateInit): void {
     this.#logger.verbose(
-      "Sending ice candidate to peer: %s -- %o",
+      "Sending ice candidate to peer: {%s} %o",
       toPeer.substring(0, 8),
       candidate,
     );
@@ -126,7 +126,7 @@ export default class SocketIoSignaler implements ClientSignaler {
 
   rejectOffer(toPeer: PeerId): void {
     this.#logger.verbose(
-      "Sending offer rejection to peer: %s",
+      "Sending offer rejection to peer: {%s}",
       toPeer.substring(0, 8),
     );
     this._socket.emit("rejectOffer", toPeer);
@@ -136,7 +136,7 @@ export default class SocketIoSignaler implements ClientSignaler {
     event: E,
     listener: SignalerEvents[E],
   ): void {
-    this.#logger.log("Registering event listener for event: %s", event);
+    this.#logger.log("Registering event listener for event: {%s}", event);
     this._socket.on(
       event,
       listener as Parameters<typeof this._socket.on<E>>[1],
@@ -147,7 +147,7 @@ export default class SocketIoSignaler implements ClientSignaler {
     event: E,
     listener: SignalerEvents[E],
   ): void {
-    this.#logger.log("Removing event listener for event: %s", event);
+    this.#logger.log("Removing event listener for event: {%s}", event);
     this._socket.off(
       event,
       listener as Parameters<typeof this._socket.on<E>>[1],
@@ -155,11 +155,11 @@ export default class SocketIoSignaler implements ClientSignaler {
   }
 
   async connectToRoom(roomName: string): Promise<Result<PeerId>> {
-    this.#logger.log("Connecting to room: %s", roomName);
+    this.#logger.log("Connecting to room: {%s}", roomName);
     const connectedRes = await result.fromPromise(this._ensureConnected);
     if (connectedRes.isError()) {
       this.#logger.error(
-        "Failed to connect to room: %s -- %o",
+        "Failed to connect to room: {%s} %o",
         roomName,
         connectedRes.error,
       );

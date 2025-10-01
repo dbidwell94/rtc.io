@@ -6,7 +6,7 @@ import Button from "./components/Button";
 import { P2PProvider } from "@rtcio/react";
 import Chat from "./Chat";
 import LocalSignalServer from "../../signalLocalBrowser/dist";
-import type { ClientSignaler } from "@rtcio/signaling";
+import SocketIoSignaler from "@rtcio/socket-io-client";
 import { useAppDispatch, useAppSelector } from "./store";
 import Input from "./components/Input";
 import { setMyName } from "./store/user";
@@ -111,7 +111,7 @@ export default function App() {
         signaler={
           demoTypeValue === DemoType.LocalOnly
             ? new LocalSignalServer()
-            : (null as unknown as ClientSignaler)
+            : new SocketIoSignaler("wss://rtcio-demo.biddydev.com")
         }
       >
         <div className={cls`w-lvw h-lvh`}>
